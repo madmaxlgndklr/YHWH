@@ -33,7 +33,14 @@ class GameEngine(
     private val _snapshot = MutableStateFlow<GameSnapshot?>(null)
     val snapshot: StateFlow<GameSnapshot?> = _snapshot.asStateFlow()
 
-    fun registerSystem(system: GameSystem) { systems.add(system) }
+    private var activeSystem: GameSystem? = null
+
+    /** Registers [system] and sets it as the active snapshot source. In Phase 1 only one system
+     *  is registered per epoch; re-registering replaces the active snapshot source. */
+    fun registerSystem(system: GameSystem) {
+        systems.add(system)
+        activeSystem = system  // last registered wins; callers set epoch-appropriate system
+    }
 
     /** Call on fresh game start. Initializes world via each system and emits first snapshot. */
     fun initNewGame() {
@@ -102,7 +109,7 @@ class GameEngine(
     }
 
     private fun emitSnapshot() {
-        val snap = systems.firstOrNull()?.toSnapshot(world, tickCount) ?: return
+        val snap = activeSystem?.toSnapshot(world, tickCount) ?: return
         _snapshot.value = snap
     }
 }
