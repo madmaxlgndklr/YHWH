@@ -17,6 +17,7 @@ import com.madmaxlgndklr.yhwh.ui.GameViewModel
 import com.madmaxlgndklr.yhwh.ui.components.ActionPanel
 import com.madmaxlgndklr.yhwh.ui.components.CosmosCanvas
 import com.madmaxlgndklr.yhwh.ui.components.GameTopBar
+import com.madmaxlgndklr.yhwh.ui.components.TutorialOverlay
 
 @Composable
 fun GameScreen(
@@ -36,6 +37,7 @@ fun GameScreen(
         ) {
             CosmosCanvas(
                 state = cosmosState,
+                onTap = viewModel::onQuantumFluctuationTap,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -83,6 +85,14 @@ fun GameScreen(
                     }
                 }
             }
+        }
+
+        // Tutorial coach-mark overlay — renders on top of everything
+        if (uiState.tutorialStep in 1..3) {
+            TutorialOverlay(
+                step = uiState.tutorialStep,
+                onNext = viewModel::onTutorialNext
+            )
         }
     }
 }
