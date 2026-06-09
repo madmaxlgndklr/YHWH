@@ -33,7 +33,7 @@ data class UpgradeSnapshot(
 data class GameSnapshot(
     val tick: Long,
     val epoch: EpochType,
-    val resources: Map<ResourceType, BigDouble>,
+    val resources: Map<String, BigDouble>,
     val generators: List<GeneratorSnapshot>,
     val upgrades: List<UpgradeSnapshot>,
     /** 0f–1f. Reaches 1.0 when epoch win condition is met. */
