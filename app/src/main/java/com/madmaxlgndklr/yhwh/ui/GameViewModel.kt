@@ -11,11 +11,13 @@ import com.madmaxlgndklr.yhwh.persistence.SaveManager
 import com.madmaxlgndklr.yhwh.systems.CosmologySystem
 import com.madmaxlgndklr.yhwh.ui.state.CosmosState
 import com.madmaxlgndklr.yhwh.ui.state.GameUiState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
@@ -23,6 +25,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val saveFile = File(application.filesDir, "yhwh_save.json")
     private val saveManager = SaveManager(saveFile)
     private val engine = GameEngine(scope = viewModelScope)
+    private val tutorialPrefs = TutorialPrefs(application)
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -33,22 +36,34 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val cosmosState: StateFlow<CosmosState> = _cosmosState.asStateFlow()
 
     init {
+        // Determine initial tutorial step before the engine starts emitting
+        val initialTutorialStep = when {
+            !tutorialPrefs.completed || tutorialPrefs.enabledOnNextLaunch -> {
+                tutorialPrefs.enabledOnNextLaunch = false  // consume the flag
+                1
+            }
+            else -> 4
+        }
+        _uiState.value = _uiState.value.copy(tutorialStep = initialTutorialStep)
+
         engine.registerSystem(CosmologySystem())
         engine.onSaveDue = { snapshot ->
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                saveManager.save(snapshot)
-            }
+            withContext(Dispatchers.IO) { saveManager.save(snapshot) }
         }
 
         viewModelScope.launch {
             engine.snapshot.filterNotNull().collect { snapshot ->
                 val newUiState = snapshot.toUiState()
-                // Detect epoch transition: progress reached 1.0 and we haven't shown the overlay yet
-                val showTransition = snapshot.epochProgress >= 1f && !epochTransitionAcknowledged && !_uiState.value.showEpochTransition
+                val showTransition = snapshot.epochProgress >= 1f &&
+                        !epochTransitionAcknowledged &&
+                        !_uiState.value.showEpochTransition
                 _uiState.value = newUiState.copy(
                     showEpochTransition = showTransition || _uiState.value.showEpochTransition,
-                    transitionMessage = if (showTransition) "A world has formed. Life stirs in the primordial ocean." else _uiState.value.transitionMessage,
-                    offlineEarningsSummary = _uiState.value.offlineEarningsSummary
+                    transitionMessage = if (showTransition)
+                        "A world has formed. Life stirs in the primordial ocean."
+                    else _uiState.value.transitionMessage,
+                    offlineEarningsSummary = _uiState.value.offlineEarningsSummary,
+                    tutorialStep = _uiState.value.tutorialStep  // preserve across ticks
                 )
                 _cosmosState.value = snapshot.toCosmosState()
             }
@@ -85,13 +100,29 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(offlineEarningsSummary = null)
     }
 
+    /** Advance to the next tutorial step. Marks tutorial complete at step 4. */
+    fun onTutorialNext() {
+        val next = _uiState.value.tutorialStep + 1
+        if (next >= 4) tutorialPrefs.completed = true
+        _uiState.value = _uiState.value.copy(tutorialStep = next.coerceAtMost(4))
+    }
+
+    /**
+     * Set whether the tutorial should re-show on next launch.
+     * [enabled] = true schedules a re-show; false cancels a pending re-show.
+     */
+    fun onTutorialReset(enabled: Boolean) {
+        tutorialPrefs.enabledOnNextLaunch = enabled
+    }
+
+    /** Expose the current tutorial preference for the Settings screen switch. */
+    fun isTutorialResetPending(): Boolean = tutorialPrefs.enabledOnNextLaunch
+
     override fun onCleared() {
         super.onCleared()
         engine.stop()
         engine.snapshot.value?.let { snapshot ->
-            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                saveManager.save(snapshot)
-            }
+            viewModelScope.launch(Dispatchers.IO) { saveManager.save(snapshot) }
         }
     }
 
@@ -123,11 +154,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    private fun formatOfflineTime(ticks: Long): String {
-        return when {
-            ticks < 60 -> "${ticks}s"
-            ticks < 3600 -> "${ticks / 60}m"
-            else -> "${ticks / 3600}h ${(ticks % 3600) / 60}m"
-        }
+    private fun formatOfflineTime(ticks: Long): String = when {
+        ticks < 60 -> "${ticks}s"
+        ticks < 3600 -> "${ticks / 60}m"
+        else -> "${ticks / 3600}h ${(ticks % 3600) / 60}m"
     }
 }
