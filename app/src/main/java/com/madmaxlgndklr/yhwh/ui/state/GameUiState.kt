@@ -14,5 +14,10 @@ data class GameUiState(
     val recentEvents: List<String> = emptyList(),
     val offlineEarningsSummary: String? = null,
     val showEpochTransition: Boolean = false,
-    val transitionMessage: String = ""
+    val transitionMessage: String = "",
+    /**
+     * 0 = uninitialized (ViewModel overwrites before first frame),
+     * 1–3 = active tutorial step, 4 = complete/dismissed.
+     */
+    val tutorialStep: Int = 0
 )
