@@ -1,5 +1,6 @@
 package com.madmaxlgndklr.yhwh.engine
 
+import com.madmaxlgndklr.yhwh.systems.CosmologySystem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,8 +63,18 @@ class GameEngine(
         }
         // Patch purchased upgrade flags
         savedSnapshot.upgrades.filter { it.purchased }.forEach { upgSnap ->
-            world.get<UpgradeComponent>("upg_${upgSnap.id}")?.purchased = true
+            world.get<UpgradeComponent>(upgSnap.id)?.purchased = true
         }
+        // Restore generator state (level, productionRate, unlocked) from snapshot
+        savedSnapshot.generators.forEach { genSnap ->
+            world.get<GeneratorComponent>(genSnap.id)?.let { gen ->
+                gen.level = genSnap.level
+                gen.productionRate = genSnap.productionRate
+                gen.unlocked = genSnap.unlocked
+            }
+        }
+        // Let CosmologySystem sync any internal state from the restored world
+        systems.filterIsInstance<CosmologySystem>().forEach { it.syncStateFromWorld(world) }
         tickCount = savedSnapshot.tick
         // Apply offline progress as a single batch tick
         val clampedDelta = missedTicks.coerceAtMost(maxOfflineTicks)

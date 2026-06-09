@@ -97,7 +97,7 @@ class CosmologySystem : GameSystem, PlayerActionHandler {
             effect = UpgradeEffect.UnlockGenerator(KEY_GEN_ACCRETION)
         ))
         world.put(KEY_UPG_GRAVITATIONAL_COLLAPSE, UpgradeComponent(
-            id = KEY_UPG_GRAVITATIONAL_COLLAPSE, purchased = false,
+            id = KEY_UPG_GRAVITATIONAL_COLLAPSE, purchased = true,  // available from start, no unlock needed
             costType = ResourceType.ACCRETION_DISKS, costAmount = collapseCost,
             effect = UpgradeEffect.ManualConversion(
                 inputType = ResourceType.ACCRETION_DISKS,
@@ -172,7 +172,8 @@ class CosmologySystem : GameSystem, PlayerActionHandler {
 
         when (val effect = upg.effect) {
             is UpgradeEffect.ManualConversion -> {
-                // Repeatable: consume input, produce output (no `purchased` flag change)
+                // ManualConversion is repeatable but requires purchased=true to be activated first
+                if (!upg.purchased) return
                 val inputRes = resourceComp(world, "res_${effect.inputType.name.lowercase()}") ?: return
                 if (inputRes.amount < effect.inputAmount) return
                 inputRes.amount = inputRes.amount - effect.inputAmount
@@ -231,6 +232,14 @@ class CosmologySystem : GameSystem, PlayerActionHandler {
         } else {
             BASE_TAP_MATTER
         }
+    }
+
+    /** Called after restore() has patched all world state. Syncs instance flags from world. */
+    fun syncStateFromWorld(world: World) {
+        val stars = world.get<ResourceComponent>(KEY_RES_STARS)?.amount ?: BigDouble.ZERO
+        val planets = world.get<ResourceComponent>(KEY_RES_PLANETS)?.amount ?: BigDouble.ZERO
+        firstStarFired = stars > BigDouble.ZERO
+        firstPlanetFired = planets > BigDouble.ZERO
     }
 
     override fun toSnapshot(world: World, tick: Long): GameSnapshot {
