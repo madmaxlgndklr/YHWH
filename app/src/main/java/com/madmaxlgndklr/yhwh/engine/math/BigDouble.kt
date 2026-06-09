@@ -10,6 +10,9 @@ import kotlin.math.pow
  * Fixed-precision large number representation: mantissa × 10^exponent.
  * Mantissa is always normalized to [1.0, 10.0) except for ZERO.
  * Supports only non-negative values (resource amounts never go below zero).
+ *
+ * NOTE: The primary constructor is public for serialization. Always construct via [of],
+ * operators, or constants ([ZERO], [ONE]) — direct construction bypasses normalization.
  */
 @Serializable
 data class BigDouble(val mantissa: Double, val exponent: Int) : Comparable<BigDouble> {
@@ -25,7 +28,7 @@ data class BigDouble(val mantissa: Double, val exponent: Int) : Comparable<BigDo
             return normalize(BigDouble(mant, exp))
         }
 
-        fun normalize(bd: BigDouble): BigDouble {
+        private fun normalize(bd: BigDouble): BigDouble {
             if (bd.mantissa == 0.0 || !bd.mantissa.isFinite()) return ZERO
             var m = bd.mantissa
             var e = bd.exponent
@@ -72,6 +75,8 @@ data class BigDouble(val mantissa: Double, val exponent: Int) : Comparable<BigDo
     }
 
     fun toDouble(): Double = mantissa * 10.0.pow(exponent)
+
+    override fun toString() = toDisplayString()
 
     fun toDisplayString(): String = when {
         exponent < 3 -> "%.2f".format(toDouble())
