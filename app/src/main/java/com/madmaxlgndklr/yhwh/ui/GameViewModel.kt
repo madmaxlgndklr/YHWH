@@ -1,8 +1,10 @@
 package com.madmaxlgndklr.yhwh.ui
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.madmaxlgndklr.yhwh.data.remote.AuthRepository
 import com.madmaxlgndklr.yhwh.engine.GameEngine
 import com.madmaxlgndklr.yhwh.engine.GameSnapshot
 import com.madmaxlgndklr.yhwh.engine.ResourceType
@@ -26,6 +28,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val saveManager = SaveManager(saveFile)
     private val engine = GameEngine(scope = viewModelScope)
     private val tutorialPrefs = TutorialPrefs(application)
+    val authRepository = AuthRepository()
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -36,10 +39,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val cosmosState: StateFlow<CosmosState> = _cosmosState.asStateFlow()
 
     init {
-        // Determine initial tutorial step before the engine starts emitting
         val initialTutorialStep = when {
             !tutorialPrefs.completed || tutorialPrefs.enabledOnNextLaunch -> {
-                tutorialPrefs.enabledOnNextLaunch = false  // consume the flag
+                tutorialPrefs.enabledOnNextLaunch = false
                 1
             }
             else -> 4
@@ -63,7 +65,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         "A world has formed. Life stirs in the primordial ocean."
                     else _uiState.value.transitionMessage,
                     offlineEarningsSummary = _uiState.value.offlineEarningsSummary,
-                    tutorialStep = _uiState.value.tutorialStep  // preserve across ticks
+                    tutorialStep = _uiState.value.tutorialStep
                 )
                 _cosmosState.value = snapshot.toCosmosState()
             }
@@ -81,14 +83,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             engine.initNewGame()
         }
-
         engine.start()
+
+        // Silent anonymous sign-in — runs after engine starts, never blocks the game
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                authRepository.signInAnonymously()
+                Log.d("GameViewModel", "Anonymous auth: userId=${authRepository.currentUserId()}")
+            } catch (e: Exception) {
+                Log.e("GameViewModel", "Anonymous sign-in failed — continuing offline", e)
+            }
+        }
     }
 
     fun onQuantumFluctuationTap() { engine.onPlayerTap() }
-
     fun onUpgradePurchase(upgradeId: String) { engine.purchaseUpgrade(upgradeId) }
-
     fun onGeneratorPurchase(generatorId: String) { engine.purchaseGenerator(generatorId) }
 
     fun dismissEpochTransition() {
@@ -100,22 +109,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(offlineEarningsSummary = null)
     }
 
-    /** Advance to the next tutorial step. Marks tutorial complete at step 4. */
     fun onTutorialNext() {
         val next = _uiState.value.tutorialStep + 1
         if (next >= 4) tutorialPrefs.completed = true
         _uiState.value = _uiState.value.copy(tutorialStep = next.coerceAtMost(4))
     }
 
-    /**
-     * Set whether the tutorial should re-show on next launch.
-     * [enabled] = true schedules a re-show; false cancels a pending re-show.
-     */
-    fun onTutorialReset(enabled: Boolean) {
-        tutorialPrefs.enabledOnNextLaunch = enabled
-    }
+    fun onTutorialReset(enabled: Boolean) { tutorialPrefs.enabledOnNextLaunch = enabled }
 
-    /** Expose the current tutorial preference for the Settings screen switch. */
     fun isTutorialResetPending(): Boolean = tutorialPrefs.enabledOnNextLaunch
 
     override fun onCleared() {
