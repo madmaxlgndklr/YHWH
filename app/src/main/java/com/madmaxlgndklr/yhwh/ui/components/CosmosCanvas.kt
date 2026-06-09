@@ -4,6 +4,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -11,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import com.madmaxlgndklr.yhwh.ui.state.CosmosState
 import kotlin.math.cos
 import kotlin.math.sin
@@ -18,9 +21,27 @@ import kotlin.random.Random
 
 private data class Star(val x: Float, val y: Float, val radius: Float, val alpha: Float)
 
+/** A single tap-burst effect at [position], animated over [BURST_DURATION_MS]. */
+private data class TapBurst(val position: Offset, val startTime: Long)
+
+private const val BURST_DURATION_MS = 400L
+private const val BURST_PARTICLE_COUNT = 7
+private const val BURST_MAX_RADIUS = 80f
+
+/**
+ * Animated canvas backdrop for the current epoch.
+ *
+ * @param onTap Optional callback triggered on each tap. When non-null, the canvas
+ *              also shows a particle burst at the tap position.
+ */
 @Composable
-fun CosmosCanvas(state: CosmosState, modifier: Modifier = Modifier) {
+fun CosmosCanvas(
+    state: CosmosState,
+    onTap: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
     val starField = remember { generateStarField(count = 150) }
+    val bursts = remember { mutableStateListOf<TapBurst>() }
 
     val infiniteTransition = rememberInfiniteTransition(label = "cosmos")
     val orbitalAngle by infiniteTransition.animateFloat(
@@ -41,6 +62,16 @@ fun CosmosCanvas(state: CosmosState, modifier: Modifier = Modifier) {
         ),
         label = "glow_pulse"
     )
+    // Drive burst animation recompositions
+    val burstTick by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = BURST_DURATION_MS.toInt(), easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "burst_tick"
+    )
 
     val bgColor by animateColorAsState(
         targetValue = if (state.planetsFormed) Color(0xFF001830) else Color(0xFF050510),
@@ -48,12 +79,31 @@ fun CosmosCanvas(state: CosmosState, modifier: Modifier = Modifier) {
         label = "bg_color"
     )
 
-    Canvas(modifier = modifier.fillMaxSize().background(bgColor)) {
-        drawStarField(starField)
-        if (state.matterLevel > 0f) drawMatterParticles(state.matterLevel)
-        if (state.starsFormed) drawStellarGlow(state.starLevel, glowPulse)
-        if (state.starsFormed) drawOrbitalRing(orbitalAngle, state.starLevel)
-        if (state.planetsFormed) drawPlanetRipple(glowPulse)
+    // Clean up expired bursts
+    val now = System.currentTimeMillis()
+    bursts.removeAll { now - it.startTime > BURST_DURATION_MS }
+
+    val tapModifier = if (onTap != null) {
+        Modifier.pointerInput(Unit) {
+            detectTapGestures { offset ->
+                onTap()
+                bursts.add(TapBurst(position = offset, startTime = System.currentTimeMillis()))
+            }
+        }
+    } else Modifier
+
+    Box(modifier = modifier.then(tapModifier)) {
+        Canvas(modifier = Modifier.fillMaxSize().background(bgColor)) {
+            drawStarField(starField)
+            if (state.matterLevel > 0f) drawMatterParticles(state.matterLevel)
+            if (state.starsFormed) drawStellarGlow(state.starLevel, glowPulse)
+            if (state.starsFormed) drawOrbitalRing(orbitalAngle, state.starLevel)
+            if (state.planetsFormed) drawPlanetRipple(glowPulse)
+            // Read burstTick to force recompose each animation frame
+            @Suppress("UNUSED_EXPRESSION") burstTick
+            val drawNow = System.currentTimeMillis()
+            bursts.forEach { burst -> drawBurst(burst, drawNow) }
+        }
     }
 }
 
@@ -143,4 +193,24 @@ private fun DrawScope.drawPlanetRipple(pulse: Float) {
         radius = size.minDimension * 0.08f,
         center = Offset(cx, cy)
     )
+}
+
+private fun DrawScope.drawBurst(burst: TapBurst, now: Long) {
+    val elapsed = (now - burst.startTime).coerceIn(0L, BURST_DURATION_MS)
+    val progress = elapsed / BURST_DURATION_MS.toFloat()
+    val rng = Random(burst.startTime.toInt())
+    repeat(BURST_PARTICLE_COUNT) { i ->
+        val angle = (i.toFloat() / BURST_PARTICLE_COUNT) * 2f * Math.PI.toFloat() +
+                rng.nextFloat() * 0.4f
+        val distance = BURST_MAX_RADIUS * progress
+        val px = burst.position.x + cos(angle) * distance
+        val py = burst.position.y + sin(angle) * distance
+        val alpha = (1f - progress).coerceIn(0f, 1f)
+        val radius = (4f * (1f - progress * 0.5f)).coerceAtLeast(1f)
+        drawCircle(
+            color = Color(0xFF8080FF).copy(alpha = alpha * 0.9f),
+            radius = radius,
+            center = Offset(px, py)
+        )
+    }
 }
