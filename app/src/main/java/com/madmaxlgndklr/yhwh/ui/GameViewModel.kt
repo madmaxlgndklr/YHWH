@@ -27,18 +27,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
+    private var epochTransitionAcknowledged = false
+
     private val _cosmosState = MutableStateFlow(CosmosState())
     val cosmosState: StateFlow<CosmosState> = _cosmosState.asStateFlow()
 
     init {
         engine.registerSystem(CosmologySystem())
-        engine.onSaveDue = { snapshot -> saveManager.save(snapshot) }
+        engine.onSaveDue = { snapshot ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                saveManager.save(snapshot)
+            }
+        }
 
         viewModelScope.launch {
             engine.snapshot.filterNotNull().collect { snapshot ->
                 val newUiState = snapshot.toUiState()
                 // Detect epoch transition: progress reached 1.0 and we haven't shown the overlay yet
-                val showTransition = snapshot.epochProgress >= 1f && !_uiState.value.showEpochTransition
+                val showTransition = snapshot.epochProgress >= 1f && !epochTransitionAcknowledged && !_uiState.value.showEpochTransition
                 _uiState.value = newUiState.copy(
                     showEpochTransition = showTransition || _uiState.value.showEpochTransition,
                     transitionMessage = if (showTransition) "A world has formed. Life stirs in the primordial ocean." else _uiState.value.transitionMessage,
@@ -71,6 +77,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun onGeneratorPurchase(generatorId: String) { engine.purchaseGenerator(generatorId) }
 
     fun dismissEpochTransition() {
+        epochTransitionAcknowledged = true
         _uiState.value = _uiState.value.copy(showEpochTransition = false)
     }
 
@@ -81,7 +88,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         super.onCleared()
         engine.stop()
-        engine.snapshot.value?.let { saveManager.save(it) }
+        engine.snapshot.value?.let { snapshot ->
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                saveManager.save(snapshot)
+            }
+        }
     }
 
     private fun GameSnapshot.toUiState(): GameUiState {
