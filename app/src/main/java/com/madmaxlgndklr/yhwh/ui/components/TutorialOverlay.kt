@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -78,7 +79,11 @@ fun TutorialOverlay(step: Int, onNext: () -> Unit) {
         label = "pulse_scale"
     )
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) { /* consume all touches — prevent passthrough to canvas */ }
+    ) {
         val screenW = constraints.maxWidth.toFloat()
         val screenH = constraints.maxHeight.toFloat()
         val spotX = screenW * spec.centerXFraction
@@ -120,7 +125,9 @@ fun TutorialOverlay(step: Int, onNext: () -> Unit) {
             if (spec.cardBelowSpotlight) {
                 ((spotY + spotR + 24f) / density.density).dp
             } else {
-                ((spotY - spotR - 160f) / density.density).dp
+                // Card should appear above the spotlight — estimate card height as ~170dp
+                val cardHeightPx = 170f * density.density
+                ((spotY - spotR - cardHeightPx - 24f) / density.density).dp.coerceAtLeast(8.dp)
             }
         }
 
