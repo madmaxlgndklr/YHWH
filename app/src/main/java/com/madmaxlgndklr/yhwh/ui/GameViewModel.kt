@@ -12,6 +12,7 @@ import com.madmaxlgndklr.yhwh.engine.GameEngine
 import com.madmaxlgndklr.yhwh.engine.GameSnapshot
 import com.madmaxlgndklr.yhwh.engine.ResourceType
 import com.madmaxlgndklr.yhwh.engine.math.BigDouble
+import com.madmaxlgndklr.yhwh.persistence.SaveData
 import com.madmaxlgndklr.yhwh.persistence.SaveManager
 import com.madmaxlgndklr.yhwh.systems.CosmologySystem
 import com.madmaxlgndklr.yhwh.ui.state.CosmosState
@@ -71,7 +72,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         engine.registerSystem(CosmologySystem())
         engine.onSaveDue = { snapshot ->
-            withContext(Dispatchers.IO) { saveManager.save(snapshot) }
+            withContext(Dispatchers.IO) {
+                val ts = System.currentTimeMillis()
+                saveManager.save(snapshot, overrideTimestamp = ts)
+                if (!authRepository.isAnonymous()) {
+                    runCatching {
+                        syncRepository.pushSave(SaveData(lastTickTimestamp = ts, snapshot = snapshot))
+                    }.onFailure { Log.e("GameViewModel", "periodic cloud push failed", it) }
+                }
+            }
         }
 
         viewModelScope.launch {
