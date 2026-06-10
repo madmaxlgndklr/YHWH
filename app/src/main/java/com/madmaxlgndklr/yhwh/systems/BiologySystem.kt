@@ -29,6 +29,7 @@ class BiologySystem : GameSystem, PlayerActionHandler, Restorable {
         const val WIN_THRESHOLD = 1000.0
 
         private val BASE_TAP_AMINO_ACIDS = BigDouble.ONE
+        private val BASE_AMINO_ACIDS_PER_TICK = BigDouble.of(2.0)
         private val INITIAL_EVOLUTION_COST = BigDouble.of(100.0)
     }
 
@@ -53,7 +54,7 @@ class BiologySystem : GameSystem, PlayerActionHandler, Restorable {
         world.put(KEY_GEN_PROTEIN_SYNTHESIZER, GeneratorComponent(
             id = KEY_GEN_PROTEIN_SYNTHESIZER, productionType = ResourceType.PROTEINS,
             productionRate = BigDouble.ONE, costType = ResourceType.AMINO_ACIDS,
-            costAmount = BigDouble.of(5.0), unlocked = false
+            costAmount = BigDouble.of(2.0), unlocked = false
         ))
         world.put(KEY_GEN_CELL_DIVISION, GeneratorComponent(
             id = KEY_GEN_CELL_DIVISION, productionType = ResourceType.CELLS,
@@ -110,6 +111,11 @@ class BiologySystem : GameSystem, PlayerActionHandler, Restorable {
     override fun tick(world: World, delta: Long): List<GameEvent> {
         val events = mutableListOf<GameEvent>()
         val bigDelta = BigDouble.of(delta.toDouble())
+
+        // Passive amino acid generation — guarantees steady progress even without Prebiotic Soup
+        resourceComp(world, KEY_RES_AMINO_ACIDS)?.let {
+            it.amount = it.amount + BASE_AMINO_ACIDS_PER_TICK * bigDelta
+        }
 
         runGenerator(world, KEY_GEN_PREBIOTIC_SOUP, bigDelta)
         runGenerator(world, KEY_GEN_PROTEIN_SYNTHESIZER, bigDelta)

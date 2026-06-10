@@ -112,12 +112,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         engine.registerSystem(system)
         if (saved != null) {
             val missed = saveManager.computeMissedTicks(saved.lastTickTimestamp)
-            if (missed > 0) {
-                _uiState.value = _uiState.value.copy(
-                    offlineEarningsSummary = "You were away for ~${formatOfflineTime(missed)} — your generators kept working."
-                )
-            }
             engine.restore(saved.snapshot, missed)
+            if (missed > 0) {
+                val summary = buildOfflineSummary(saved.snapshot.resources, engine.snapshot.value?.resources ?: emptyMap(), missed)
+                if (summary != null) {
+                    _uiState.value = _uiState.value.copy(offlineEarningsSummary = summary)
+                }
+            }
         } else {
             engine.initNewGame()
         }
@@ -321,6 +322,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    private fun buildOfflineSummary(
+        before: Map<String, BigDouble>,
+        after: Map<String, BigDouble>,
+        missedTicks: Long
+    ): String? {
+        val gains = after.mapNotNull { (typeName, afterAmount) ->
+            val delta = afterAmount - (before[typeName] ?: BigDouble.ZERO)
+            if (delta > BigDouble.ZERO) {
+                runCatching { ResourceType.valueOf(typeName) }.getOrNull()?.let { type ->
+                    "+${delta.toDisplayString()} ${type.displayName}"
+                }
+            } else null
+        }
+        if (gains.isEmpty()) return null
+        return "Away for ~${formatOfflineTime(missedTicks)}\n\n${gains.joinToString("\n")}"
     }
 
     private fun formatOfflineTime(ticks: Long): String = when {

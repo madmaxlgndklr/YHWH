@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,12 +27,16 @@ fun ActionPanel(
     val tabs = listOf("Actions", "Upgrades", "Stats")
 
     Column(modifier = modifier) {
-        TabRow(selectedTabIndex = selectedTab) {
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color(0xFF1A1A4E),
+            contentColor = Color.White
+        ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTab == index,
                     onClick = { selectedTab = index },
-                    text = { Text(title) }
+                    text = { Text(title, color = Color.White) }
                 )
             }
         }
@@ -146,11 +151,6 @@ private fun StatsTab(state: GameUiState) {
         modifier = Modifier.padding(16.dp).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        state.offlineEarningsSummary?.let { summary ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                Text(text = summary, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
-            }
-        }
         Text("Epoch Progress", fontWeight = FontWeight.Bold)
         LinearProgressIndicator(
             progress = { state.epochProgress },

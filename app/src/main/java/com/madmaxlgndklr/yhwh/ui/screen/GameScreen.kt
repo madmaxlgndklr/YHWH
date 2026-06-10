@@ -102,6 +102,11 @@ fun GameScreen(
             )
         }
 
+        // Offline earnings dialog — shown on return, dismissed by tapping Collect
+        uiState.offlineEarningsSummary?.let { summary ->
+            OfflineEarningsDialog(summary = summary, onCollect = viewModel::dismissOfflineSummary)
+        }
+
         // Save conflict dialog — not dismissible without choosing
         if (conflictState is ConflictState.Pending) {
             val pending = conflictState as ConflictState.Pending
@@ -113,6 +118,33 @@ fun GameScreen(
             )
         }
     }
+}
+
+@Composable
+private fun OfflineEarningsDialog(summary: String, onCollect: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = { /* must tap Collect */ },
+        containerColor = Color(0xFF1A1A4E),
+        title = {
+            Text("Welcome back!", fontWeight = FontWeight.Bold, color = Color.White)
+        },
+        text = {
+            Text(
+                text = summary,
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 14.sp,
+                lineHeight = 22.sp
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onCollect,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4466AA))
+            ) {
+                Text("Collect")
+            }
+        }
+    )
 }
 
 @Composable

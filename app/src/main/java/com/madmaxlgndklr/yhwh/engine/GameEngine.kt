@@ -78,7 +78,7 @@ class GameEngine(
         // Apply offline progress as a single batch tick
         val clampedDelta = missedTicks.coerceAtMost(maxOfflineTicks)
         if (clampedDelta > 0L) {
-            systems.forEach { it.tick(world, clampedDelta) }
+            activeSystem?.tick(world, clampedDelta)
             tickCount += clampedDelta
         }
         emitSnapshot()
@@ -88,7 +88,7 @@ class GameEngine(
         tickJob = engineScope.launch {
             while (true) {
                 delay(tickIntervalMs)
-                systems.forEach { it.tick(world, 1L) }
+                activeSystem?.tick(world, 1L)
                 tickCount++
                 emitSnapshot()
                 if (tickCount % saveEveryNTicks == 0L) {
@@ -108,21 +108,21 @@ class GameEngine(
         emitSnapshot()
     }
 
-    /** Route a player tap to all systems that implement [PlayerActionHandler]. */
+    /** Route a player tap to the active system. */
     fun onPlayerTap() {
-        systems.filterIsInstance<PlayerActionHandler>().forEach { it.onTap(world) }
+        (activeSystem as? PlayerActionHandler)?.onTap(world)
         emitSnapshot()
     }
 
-    /** Route an upgrade purchase to all systems that implement [PlayerActionHandler]. */
+    /** Route an upgrade purchase to the active system. */
     fun purchaseUpgrade(upgradeId: String) {
-        systems.filterIsInstance<PlayerActionHandler>().forEach { it.purchaseUpgrade(world, upgradeId) }
+        (activeSystem as? PlayerActionHandler)?.purchaseUpgrade(world, upgradeId)
         emitSnapshot()
     }
 
-    /** Route a generator level-up to all systems that implement [PlayerActionHandler]. */
+    /** Route a generator level-up to the active system. */
     fun purchaseGenerator(generatorId: String) {
-        systems.filterIsInstance<PlayerActionHandler>().forEach { it.purchaseGenerator(world, generatorId) }
+        (activeSystem as? PlayerActionHandler)?.purchaseGenerator(world, generatorId)
         emitSnapshot()
     }
 
