@@ -29,7 +29,7 @@ class EvolutionSystem : GameSystem, PlayerActionHandler, Restorable {
         const val SPECIES_VISUAL_THRESHOLD = 200.0
         const val WIN_THRESHOLD = 1000.0
 
-        const val EVENT_GRACE_TICKS = 30
+        const val EVENT_FIRST_DELAY_TICKS = 90   // grace(30) + first interval(60)
         const val EVENT_INTERVAL_TICKS = 60
 
         private val BASE_TAP_GENES = BigDouble.ONE
@@ -44,7 +44,7 @@ class EvolutionSystem : GameSystem, PlayerActionHandler, Restorable {
     private var firstDominanceFired = false
     private var activeEvent: EvolutionEvent? = null
     private var eventTicksRemaining: Int = 0
-    private var ticksUntilNextEvent: Int = EVENT_GRACE_TICKS + EVENT_INTERVAL_TICKS
+    private var ticksUntilNextEvent: Int = EVENT_FIRST_DELAY_TICKS
 
     override fun initialize(world: World) {
         val organisms = world.get<ResourceComponent>(BiologySystem.KEY_RES_ORGANISMS)
@@ -72,6 +72,8 @@ class EvolutionSystem : GameSystem, PlayerActionHandler, Restorable {
             costAmount = BigDouble.of(2.0),
             unlocked = false
         ))
+        // Starts unlocked: no Mutations exist until the Mutation Engine runs, so the cost
+        // guard in runGenerator prevents premature Species production naturally.
         world.put(KEY_GEN_NATURAL_SELECTION_CHAMBER, GeneratorComponent(
             id = KEY_GEN_NATURAL_SELECTION_CHAMBER,
             productionType = ResourceType.SPECIES,
@@ -269,6 +271,9 @@ class EvolutionSystem : GameSystem, PlayerActionHandler, Restorable {
     }
 
     private fun currentTapProduction(world: World): BigDouble {
+        // Reads KEY_UPG_GENETIC_DRIFT specifically. KEY_UPG_ADAPTIVE_IMMUNITY also uses
+        // MultiplyTapProduction(1.0) as a no-op sentinel — do not iterate all purchased
+        // MultiplyTapProduction effects; check by key instead.
         val upg = world.get<UpgradeComponent>(KEY_UPG_GENETIC_DRIFT)
         return if (upg?.purchased == true && upg.effect is UpgradeEffect.MultiplyTapProduction) {
             BASE_TAP_GENES * (upg.effect as UpgradeEffect.MultiplyTapProduction).multiplier
@@ -288,6 +293,8 @@ class EvolutionSystem : GameSystem, PlayerActionHandler, Restorable {
         }
         val dominance = resourceComp(world, KEY_RES_DOMINANCE)?.amount ?: BigDouble.ZERO
         firstDominanceFired = dominance > BigDouble.ZERO
+        // activeEvent and eventTicksRemaining are in GameSnapshot but Restorable only receives World.
+        // On restore the active event resets; ticksUntilNextEvent restarts at EVENT_FIRST_DELAY_TICKS.
     }
 
     override fun toSnapshot(world: World, tick: Long): GameSnapshot {

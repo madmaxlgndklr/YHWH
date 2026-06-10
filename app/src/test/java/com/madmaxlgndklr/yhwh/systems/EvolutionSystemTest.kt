@@ -121,6 +121,30 @@ class EvolutionSystemTest {
         assertTrue(dominance.amount >= BigDouble.ONE)
     }
 
+    @Test fun `event fires after first delay ticks`() {
+        system.tick(world, delta = EvolutionSystem.EVENT_FIRST_DELAY_TICKS.toLong())
+        val snap = system.toSnapshot(world, 0)
+        assertNotNull(snap.activeEvent)
+    }
+
+    @Test fun `event does not fire before first delay ticks`() {
+        system.tick(world, delta = (EvolutionSystem.EVENT_FIRST_DELAY_TICKS - 1).toLong())
+        val snap = system.toSnapshot(world, 0)
+        assertNull(snap.activeEvent)
+    }
+
+    @Test fun `ice age event duration reduced by adaptive immunity`() {
+        world.get<ResourceComponent>(EvolutionSystem.KEY_RES_MUTATIONS)!!
+            .amount = BigDouble.of(1000.0)
+        system.purchaseUpgrade(world, EvolutionSystem.KEY_UPG_ADAPTIVE_IMMUNITY)
+        // Trigger event
+        system.tick(world, delta = EvolutionSystem.EVENT_FIRST_DELAY_TICKS.toLong())
+        var snap = system.toSnapshot(world, 0)
+        val eventDuration = snap.eventTicksRemaining
+        // Ice Age with immunity should be shorter
+        assertTrue(eventDuration <= 15)
+    }
+
     @Test fun `syncStateFromWorld restores fork state from world`() {
         world.get<ResourceComponent>(EvolutionSystem.KEY_RES_MUTATIONS)!!
             .amount = BigDouble.of(1000.0)
