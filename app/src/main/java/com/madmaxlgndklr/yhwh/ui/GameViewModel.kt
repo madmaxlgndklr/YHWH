@@ -9,6 +9,7 @@ import com.madmaxlgndklr.yhwh.data.remote.ConflictState
 import com.madmaxlgndklr.yhwh.data.remote.SyncRepository
 import com.madmaxlgndklr.yhwh.data.remote.SyncResult
 import com.madmaxlgndklr.yhwh.engine.EpochType
+import com.madmaxlgndklr.yhwh.engine.EvolutionEvent
 import com.madmaxlgndklr.yhwh.engine.GameEngine
 import com.madmaxlgndklr.yhwh.engine.GameSnapshot
 import com.madmaxlgndklr.yhwh.engine.GameSystem
@@ -18,6 +19,7 @@ import com.madmaxlgndklr.yhwh.persistence.SaveData
 import com.madmaxlgndklr.yhwh.persistence.SaveManager
 import com.madmaxlgndklr.yhwh.systems.BiologySystem
 import com.madmaxlgndklr.yhwh.systems.CosmologySystem
+import com.madmaxlgndklr.yhwh.systems.EvolutionSystem
 import com.madmaxlgndklr.yhwh.ui.state.CosmosState
 import com.madmaxlgndklr.yhwh.ui.state.GameUiState
 import com.madmaxlgndklr.yhwh.ui.state.ResourceDisplay
@@ -94,9 +96,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         !_uiState.value.showEpochTransition
                 _uiState.value = newUiState.copy(
                     showEpochTransition = showTransition || _uiState.value.showEpochTransition,
-                    transitionMessage = if (showTransition)
-                        "A world has formed. Life stirs in the primordial ocean."
-                    else _uiState.value.transitionMessage,
+                    transitionMessage = if (showTransition) when (snapshot.epoch) {
+                        EpochType.COSMOLOGY -> "A world has formed. Life stirs in the primordial ocean."
+                        EpochType.BIOLOGY -> "Organisms compete for survival. Evolution begins."
+                        else -> "The next age dawns."
+                    } else _uiState.value.transitionMessage,
                     offlineEarningsSummary = _uiState.value.offlineEarningsSummary,
                     tutorialStep = _uiState.value.tutorialStep
                 )
@@ -107,6 +111,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val saved = saveManager.load()
         val system: GameSystem = when (saved?.snapshot?.epoch) {
             EpochType.BIOLOGY -> BiologySystem()
+            EpochType.EVOLUTION -> EvolutionSystem()
             else -> CosmologySystem()
         }
         engine.registerSystem(system)
@@ -243,6 +248,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(showEpochTransition = false)
         when (engine.snapshot.value?.epoch) {
             EpochType.COSMOLOGY -> engine.advanceEpoch(BiologySystem())
+            EpochType.BIOLOGY -> engine.advanceEpoch(EvolutionSystem())
             else -> { /* future epochs */ }
         }
     }
@@ -298,7 +304,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             epochProgress = epochProgress,
             generators = generators,
             upgrades = upgrades,
-            recentEvents = events.map { it.message }.takeLast(5)
+            recentEvents = events.map { it.message }.takeLast(5),
+            activeEvent = activeEvent,
+            eventTicksRemaining = eventTicksRemaining
         )
     }
 
@@ -313,6 +321,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         .toFloat().coerceIn(0f, 1f),
                     cellLevel = (cells.toDouble() / BiologySystem.CELL_VISUAL_THRESHOLD)
                         .toFloat().coerceIn(0f, 1f)
+                )
+            }
+            EpochType.EVOLUTION -> {
+                val mutations = resources[ResourceType.MUTATIONS.name] ?: BigDouble.ZERO
+                val species = resources[ResourceType.SPECIES.name] ?: BigDouble.ZERO
+                CosmosState(
+                    epoch = epoch,
+                    mutationLevel = (mutations.toDouble() / EvolutionSystem.MUTATION_VISUAL_THRESHOLD)
+                        .toFloat().coerceIn(0f, 1f),
+                    speciesLevel = (species.toDouble() / EvolutionSystem.SPECIES_VISUAL_THRESHOLD)
+                        .toFloat().coerceIn(0f, 1f),
+                    activeEvent = activeEvent
                 )
             }
             else -> {
