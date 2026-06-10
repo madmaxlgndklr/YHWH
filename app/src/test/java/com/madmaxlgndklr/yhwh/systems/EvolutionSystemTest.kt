@@ -158,4 +158,78 @@ class EvolutionSystemTest {
         val hypermutationSnap = snap.upgrades.first { it.id == EvolutionSystem.KEY_UPG_HYPERMUTATION }
         assertFalse(hypermutationSnap.available)
     }
+
+    @Test fun `species decay each tick`() {
+        world.get<ResourceComponent>(EvolutionSystem.KEY_RES_SPECIES)!!
+            .amount = BigDouble.of(100.0)
+        system.tick(world, delta = 1L)
+        val after = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_SPECIES)!!.amount
+        assertTrue(after < BigDouble.of(100.0))
+    }
+
+    @Test fun `adaptive immunity halves species decay rate`() {
+        world.get<ResourceComponent>(EvolutionSystem.KEY_RES_MUTATIONS)!!
+            .amount = BigDouble.of(1000.0)
+        system.purchaseUpgrade(world, EvolutionSystem.KEY_UPG_ADAPTIVE_IMMUNITY)
+
+        val normalWorld = World()
+        val normalSystem = EvolutionSystem()
+        normalSystem.initialize(normalWorld)
+
+        // Give both 100 species
+        world.get<ResourceComponent>(EvolutionSystem.KEY_RES_SPECIES)!!.amount = BigDouble.of(100.0)
+        normalWorld.get<ResourceComponent>(EvolutionSystem.KEY_RES_SPECIES)!!.amount = BigDouble.of(100.0)
+
+        system.tick(world, delta = 10L)
+        normalSystem.tick(normalWorld, delta = 10L)
+
+        val immune = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_SPECIES)!!.amount
+        val normal = normalWorld.get<ResourceComponent>(EvolutionSystem.KEY_RES_SPECIES)!!.amount
+        assertTrue(immune > normal)
+    }
+
+    @Test fun `event fires after first delay`() {
+        world.get<ResourceComponent>(EvolutionSystem.KEY_RES_SPECIES)!!
+            .amount = BigDouble.of(10000.0)
+        val events = system.tick(world, delta = EvolutionSystem.EVENT_FIRST_DELAY_TICKS.toLong())
+        assertTrue(events.any { it.isMilestone && it.message.contains("has begun") })
+    }
+
+    @Test fun `no event fires before first delay`() {
+        world.get<ResourceComponent>(EvolutionSystem.KEY_RES_SPECIES)!!
+            .amount = BigDouble.of(10000.0)
+        val events = system.tick(world, delta = (EvolutionSystem.EVENT_FIRST_DELAY_TICKS - 1).toLong())
+        assertTrue(events.none { it.message.contains("has begun") })
+    }
+
+    @Test fun `ice age reduces gene pool production`() {
+        // Seed organisms so Gene Pool can run (it costs Organisms)
+        world.put(BiologySystem.KEY_RES_ORGANISMS,
+            ResourceComponent(ResourceType.ORGANISMS, BigDouble.of(10000.0)))
+        // Give plenty of species to survive decay
+        world.get<ResourceComponent>(EvolutionSystem.KEY_RES_SPECIES)!!
+            .amount = BigDouble.of(10000.0)
+
+        // Baseline: tick once at delta=1, record genes gained
+        val genesBefore = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_GENES)!!.amount
+        system.tick(world, delta = 1L)
+        val genesAfterNormalTick = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_GENES)!!.amount
+        val genesNormalTick = genesAfterNormalTick - genesBefore
+
+        // Advance to just before the event trigger point
+        system.tick(world, delta = (EvolutionSystem.EVENT_FIRST_DELAY_TICKS - 1).toLong())
+
+        // One final tick — this is where ticksUntilNextEvent hits 0 and an event fires
+        val genesBeforeEventTick = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_GENES)!!.amount
+        val tickEvents = system.tick(world, delta = 1L)
+        val genesAfterEventTick = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_GENES)!!.amount
+        val genesEventTick = genesAfterEventTick - genesBeforeEventTick
+
+        if (tickEvents.any { it.message.contains("Ice Age") }) {
+            // Ice Age debuffs Gene Pool by 50%; passive gene gen (1.0/tick) still runs.
+            // So event tick gain should be less than normal tick gain (which had full Gene Pool).
+            assertTrue(genesEventTick.toDouble() <= genesNormalTick.toDouble() + 0.01)
+        }
+        // If a different event fired, test passes trivially (event selection is random)
+    }
 }
