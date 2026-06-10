@@ -3,21 +3,35 @@ package com.madmaxlgndklr.yhwh.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.madmaxlgndklr.yhwh.data.remote.SupabaseModule
 import com.madmaxlgndklr.yhwh.engine.GeneratorSnapshot
 import com.madmaxlgndklr.yhwh.engine.UpgradeSnapshot
+import com.madmaxlgndklr.yhwh.ui.AuthState
+import com.madmaxlgndklr.yhwh.ui.GameViewModel
 import com.madmaxlgndklr.yhwh.ui.state.GameUiState
+import com.madmaxlgndklr.yhwh.ui.state.ResourceDisplay
+import io.github.jan.supabase.compose.auth.composeAuth
+import io.github.jan.supabase.compose.auth.composable.NativeSignInResult
+import io.github.jan.supabase.compose.auth.composable.rememberSignInWithGoogle
 
 @Composable
 fun ActionPanel(
     state: GameUiState,
+    viewModel: GameViewModel,
     onTap: () -> Unit,
     onUpgradePurchase: (String) -> Unit,
     onGeneratorPurchase: (String) -> Unit,
@@ -40,11 +54,11 @@ fun ActionPanel(
                 )
             }
         }
-        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 280.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 320.dp)) {
             when (selectedTab) {
                 0 -> ActionsTab(state.generators, onTap, onGeneratorPurchase)
                 1 -> UpgradesTab(state.upgrades, onUpgradePurchase)
-                2 -> StatsTab(state)
+                2 -> StatsTab(state, viewModel)
             }
         }
     }
@@ -146,22 +160,166 @@ private fun UpgradeCard(upg: UpgradeSnapshot, onPurchase: (String) -> Unit) {
 }
 
 @Composable
-private fun StatsTab(state: GameUiState) {
-    Column(
-        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+private fun StatsTab(state: GameUiState, viewModel: GameViewModel) {
+    LazyColumn(
+        contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text("Epoch Progress", fontWeight = FontWeight.Bold)
-        LinearProgressIndicator(
-            progress = { state.epochProgress },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Text("${(state.epochProgress * 100).toInt()}% to ${state.nextEpochName}", fontSize = 12.sp)
-        Spacer(Modifier.height(8.dp))
+        // Epoch progress
+        item {
+            Text("Epoch Progress", fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            LinearProgressIndicator(progress = { state.epochProgress }, modifier = Modifier.fillMaxWidth())
+            Text("${(state.epochProgress * 100).toInt()}% to ${state.nextEpochName}", fontSize = 12.sp)
+        }
+
+        // All resources across all epochs
+        if (state.allResources.isNotEmpty()) {
+            item {
+                Spacer(Modifier.height(4.dp))
+                Text("All Resources", fontWeight = FontWeight.Bold)
+            }
+            items(state.allResources) { res ->
+                ResourceRow(res)
+            }
+        }
+
+        // Recent events
         if (state.recentEvents.isNotEmpty()) {
-            Text("Recent Events", fontWeight = FontWeight.Bold)
-            state.recentEvents.forEach { event ->
+            item {
+                Spacer(Modifier.height(4.dp))
+                Text("Recent Events", fontWeight = FontWeight.Bold)
+            }
+            items(state.recentEvents) { event ->
                 Text("• $event", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        // Account section
+        item {
+            Spacer(Modifier.height(4.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(4.dp))
+            AccountSection(viewModel)
+        }
+    }
+}
+
+@Composable
+private fun ResourceRow(res: ResourceDisplay) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("${res.symbol} ${res.displayName}", fontSize = 13.sp)
+        Text(res.value, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun AccountSection(viewModel: GameViewModel) {
+    val authState by viewModel.authState.collectAsStateWithLifecycle()
+    val loading by viewModel.authLoading.collectAsStateWithLifecycle()
+    val error by viewModel.authError.collectAsStateWithLifecycle()
+
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isSignUp by remember { mutableStateOf(false) }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    val googleSignIn = SupabaseModule.client.composeAuth.rememberSignInWithGoogle(
+        onResult = { result ->
+            if (result is NativeSignInResult.Success) viewModel.onGoogleSignInSuccess()
+        }
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Account", fontWeight = FontWeight.Bold)
+
+        when (val s = authState) {
+            is AuthState.SignedIn -> {
+                Text(
+                    s.email ?: "Google Account",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(onClick = viewModel::signOut, modifier = Modifier.fillMaxWidth()) {
+                    Text("Sign Out", fontSize = 13.sp)
+                }
+            }
+            is AuthState.Anonymous -> {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    listOf(false to "Sign In", true to "Create Account").forEach { (signup, label) ->
+                        TextButton(
+                            onClick = { isSignUp = signup; viewModel.clearAuthError() },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(4.dp)
+                        ) {
+                            Text(
+                                label,
+                                fontSize = 12.sp,
+                                color = if (isSignUp == signup) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = if (isSignUp == signup) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email", fontSize = 12.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password", fontSize = 12.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        keyboard?.hide()
+                        if (isSignUp) viewModel.signUpWithEmail(email, password)
+                        else viewModel.signInWithEmail(email, password)
+                    })
+                )
+                if (error != null) {
+                    Text(error!!, color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Button(
+                        onClick = {
+                            keyboard?.hide()
+                            if (isSignUp) viewModel.signUpWithEmail(email, password)
+                            else viewModel.signInWithEmail(email, password)
+                        },
+                        enabled = !loading && email.isNotBlank() && password.isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        if (loading) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else {
+                            Text(if (isSignUp) "Create" else "Sign In", fontSize = 12.sp)
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { googleSignIn.startFlow() },
+                        enabled = !loading,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        Text("Google", fontSize = 12.sp)
+                    }
+                }
             }
         }
     }

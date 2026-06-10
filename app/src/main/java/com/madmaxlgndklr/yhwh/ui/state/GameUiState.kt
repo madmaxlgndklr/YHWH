@@ -14,6 +14,7 @@ data class GameUiState(
     val nextEpochName: String = "Biology",
     val tickDisplay: String = "Tick 0",
     val resources: List<ResourceDisplay> = emptyList(),
+    val allResources: List<ResourceDisplay> = emptyList(),
     val epochProgress: Float = 0f,
     val generators: List<GeneratorSnapshot> = emptyList(),
     val upgrades: List<UpgradeSnapshot> = emptyList(),

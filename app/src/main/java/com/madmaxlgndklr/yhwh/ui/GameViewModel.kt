@@ -88,7 +88,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             engine.snapshot.filterNotNull().collect { snapshot ->
-                val newUiState = snapshot.toUiState()
+                val newUiState = snapshot.toUiState(engine.snapshotAllResources())
                 val showTransition = snapshot.epochProgress >= 1f &&
                         !epochTransitionAcknowledged &&
                         !_uiState.value.showEpochTransition
@@ -269,11 +269,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun GameSnapshot.toUiState(): GameUiState {
+    private fun GameSnapshot.toUiState(worldResources: Map<String, BigDouble>): GameUiState {
         val resourceDisplays = resources.mapNotNull { (typeName, amount) ->
             runCatching { ResourceType.valueOf(typeName) }.getOrNull()?.let { type ->
                 ResourceDisplay(symbol = type.symbol, displayName = type.displayName, value = amount.toDisplayString())
             }
+        }
+        val allResourceDisplays = worldResources.mapNotNull { (typeName, amount) ->
+            if (amount > BigDouble.ZERO) {
+                runCatching { ResourceType.valueOf(typeName) }.getOrNull()?.let { type ->
+                    ResourceDisplay(symbol = type.symbol, displayName = type.displayName, value = amount.toDisplayString())
+                }
+            } else null
         }
         val nextEpochName = when (epoch) {
             EpochType.COSMOLOGY -> "Biology"
@@ -287,6 +294,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             nextEpochName = nextEpochName,
             tickDisplay = "Tick $tick",
             resources = resourceDisplays,
+            allResources = allResourceDisplays,
             epochProgress = epochProgress,
             generators = generators,
             upgrades = upgrades,

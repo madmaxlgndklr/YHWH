@@ -1,5 +1,6 @@
 package com.madmaxlgndklr.yhwh.engine
 
+import com.madmaxlgndklr.yhwh.engine.math.BigDouble
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -99,6 +100,10 @@ class GameEngine(
     }
 
     fun stop() { tickJob?.cancel() }
+
+    /** Returns current amounts for every resource in the world, across all epochs. */
+    fun snapshotAllResources(): Map<String, BigDouble> =
+        world.getAll<ResourceComponent>().associate { (_, comp) -> comp.type.name to comp.amount }
 
     /** Transitions the game to the next epoch by registering and activating [nextSystem]. */
     fun advanceEpoch(nextSystem: GameSystem) {
