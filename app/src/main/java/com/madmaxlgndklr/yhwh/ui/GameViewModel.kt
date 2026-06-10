@@ -20,6 +20,7 @@ import com.madmaxlgndklr.yhwh.systems.BiologySystem
 import com.madmaxlgndklr.yhwh.systems.CosmologySystem
 import com.madmaxlgndklr.yhwh.ui.state.CosmosState
 import com.madmaxlgndklr.yhwh.ui.state.GameUiState
+import com.madmaxlgndklr.yhwh.ui.state.ResourceDisplay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -268,13 +269,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun GameSnapshot.toUiState(): GameUiState {
-        val energy = resources[ResourceType.ENERGY.name] ?: BigDouble.ZERO
-        val matter = resources[ResourceType.MATTER.name] ?: BigDouble.ZERO
+        val resourceDisplays = resources.mapNotNull { (typeName, amount) ->
+            runCatching { ResourceType.valueOf(typeName) }.getOrNull()?.let { type ->
+                ResourceDisplay(symbol = type.symbol, displayName = type.displayName, value = amount.toDisplayString())
+            }
+        }
+        val nextEpochName = when (epoch) {
+            EpochType.COSMOLOGY -> "Biology"
+            EpochType.BIOLOGY -> "Evolution"
+            EpochType.EVOLUTION -> "Civilization"
+            EpochType.CIVILIZATION -> "Interstellar"
+            EpochType.INTERSTELLAR -> "Complete"
+        }
         return GameUiState(
             epochName = epoch.displayName,
+            nextEpochName = nextEpochName,
             tickDisplay = "Tick $tick",
-            energyDisplay = energy.toDisplayString(),
-            matterDisplay = matter.toDisplayString(),
+            resources = resourceDisplays,
             epochProgress = epochProgress,
             generators = generators,
             upgrades = upgrades,

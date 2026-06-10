@@ -156,7 +156,7 @@ private fun StatsTab(state: GameUiState) {
             progress = { state.epochProgress },
             modifier = Modifier.fillMaxWidth()
         )
-        Text("${(state.epochProgress * 100).toInt()}% to Biology", fontSize = 12.sp)
+        Text("${(state.epochProgress * 100).toInt()}% to ${state.nextEpochName}", fontSize = 12.sp)
         Spacer(Modifier.height(8.dp))
         if (state.recentEvents.isNotEmpty()) {
             Text("Recent Events", fontWeight = FontWeight.Bold)

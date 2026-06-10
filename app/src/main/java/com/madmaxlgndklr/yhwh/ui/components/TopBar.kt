@@ -1,14 +1,22 @@
 package com.madmaxlgndklr.yhwh.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
 import com.madmaxlgndklr.yhwh.ui.state.GameUiState
+import com.madmaxlgndklr.yhwh.ui.state.ResourceDisplay
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,9 +41,13 @@ fun GameTopBar(state: GameUiState) {
                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ResourceChip(symbol = "⚡", value = state.energyDisplay)
-                    ResourceChip(symbol = "⬡", value = state.matterDisplay)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(start = 8.dp)
+                ) {
+                    items(state.resources) { resource ->
+                        ResourceChip(resource)
+                    }
                 }
             }
         },
@@ -46,14 +58,44 @@ fun GameTopBar(state: GameUiState) {
 }
 
 @Composable
-private fun ResourceChip(symbol: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = symbol, fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimary)
-        Text(
-            text = value,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onPrimary
-        )
+private fun ResourceChip(resource: ResourceDisplay) {
+    var showName by remember { mutableStateOf(false) }
+
+    Box {
+        Column(
+            modifier = Modifier.clickable { showName = true },
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = resource.symbol, fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimary)
+            Text(
+                text = resource.value,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+        if (showName) {
+            Popup(
+                alignment = Alignment.BottomCenter,
+                onDismissRequest = { showName = false }
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color.Black.copy(alpha = 0.85f),
+                    tonalElevation = 4.dp
+                ) {
+                    Text(
+                        text = resource.displayName,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = Color.White,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+            LaunchedEffect(Unit) {
+                delay(1500)
+                showName = false
+            }
+        }
     }
 }
