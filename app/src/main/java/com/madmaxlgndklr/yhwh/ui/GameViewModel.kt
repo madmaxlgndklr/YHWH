@@ -22,6 +22,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+sealed class AuthState {
+    object Anonymous : AuthState()
+    data class SignedIn(val email: String?) : AuthState()
+}
+
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val saveFile = File(application.filesDir, "yhwh_save.json")
@@ -37,6 +42,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _cosmosState = MutableStateFlow(CosmosState())
     val cosmosState: StateFlow<CosmosState> = _cosmosState.asStateFlow()
+
+    private val _authState = MutableStateFlow<AuthState>(AuthState.Anonymous)
+    val authState: StateFlow<AuthState> = _authState.asStateFlow()
+
+    private val _authLoading = MutableStateFlow(false)
+    val authLoading: StateFlow<Boolean> = _authLoading.asStateFlow()
+
+    private val _authError = MutableStateFlow<String?>(null)
+    val authError: StateFlow<String?> = _authError.asStateFlow()
 
     init {
         val initialTutorialStep = when {
@@ -85,14 +99,59 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         engine.start()
 
-        // Silent anonymous sign-in — runs after engine starts, never blocks the game
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 authRepository.signInAnonymously()
+                updateAuthState()
                 Log.d("GameViewModel", "Anonymous auth: userId=${authRepository.currentUserId()}")
             } catch (e: Exception) {
                 Log.e("GameViewModel", "Anonymous sign-in failed — continuing offline", e)
             }
+        }
+    }
+
+    fun signInWithEmail(email: String, password: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _authLoading.value = true
+            _authError.value = null
+            runCatching { authRepository.signInWithEmail(email, password) }
+                .onSuccess { updateAuthState() }
+                .onFailure { _authError.value = it.message ?: "Sign in failed" }
+            _authLoading.value = false
+        }
+    }
+
+    fun signUpWithEmail(email: String, password: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _authLoading.value = true
+            _authError.value = null
+            runCatching { authRepository.signUpWithEmail(email, password) }
+                .onSuccess { updateAuthState() }
+                .onFailure { _authError.value = it.message ?: "Sign up failed" }
+            _authLoading.value = false
+        }
+    }
+
+    fun signOut() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { authRepository.signOut() }
+                .onSuccess { updateAuthState() }
+                .onFailure { Log.e("GameViewModel", "signOut failed", it) }
+        }
+    }
+
+    fun onGoogleSignInSuccess() {
+        viewModelScope.launch(Dispatchers.IO) { updateAuthState() }
+    }
+
+    fun clearAuthError() { _authError.value = null }
+
+    private fun updateAuthState() {
+        val user = authRepository.currentUser()
+        _authState.value = if (user != null && !authRepository.isAnonymous()) {
+            AuthState.SignedIn(user.email)
+        } else {
+            AuthState.Anonymous
         }
     }
 
