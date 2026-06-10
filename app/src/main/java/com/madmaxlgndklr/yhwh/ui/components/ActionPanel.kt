@@ -161,6 +161,13 @@ private fun UpgradeCard(upg: UpgradeSnapshot, onPurchase: (String) -> Unit) {
 
 @Composable
 private fun StatsTab(state: GameUiState, viewModel: GameViewModel) {
+    // Must be outside LazyColumn — activity result launchers can't register inside lazy items
+    val googleSignIn = SupabaseModule.client.composeAuth.rememberSignInWithGoogle(
+        onResult = { result ->
+            if (result is NativeSignInResult.Success) viewModel.onGoogleSignInSuccess()
+        }
+    )
+
     LazyColumn(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -200,7 +207,7 @@ private fun StatsTab(state: GameUiState, viewModel: GameViewModel) {
             Spacer(Modifier.height(4.dp))
             HorizontalDivider()
             Spacer(Modifier.height(4.dp))
-            AccountSection(viewModel)
+            AccountSection(viewModel, onGoogleSignIn = { googleSignIn.startFlow() })
         }
     }
 }
@@ -218,7 +225,7 @@ private fun ResourceRow(res: ResourceDisplay) {
 }
 
 @Composable
-private fun AccountSection(viewModel: GameViewModel) {
+private fun AccountSection(viewModel: GameViewModel, onGoogleSignIn: () -> Unit) {
     val authState by viewModel.authState.collectAsStateWithLifecycle()
     val loading by viewModel.authLoading.collectAsStateWithLifecycle()
     val error by viewModel.authError.collectAsStateWithLifecycle()
@@ -227,12 +234,6 @@ private fun AccountSection(viewModel: GameViewModel) {
     var password by remember { mutableStateOf("") }
     var isSignUp by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
-
-    val googleSignIn = SupabaseModule.client.composeAuth.rememberSignInWithGoogle(
-        onResult = { result ->
-            if (result is NativeSignInResult.Success) viewModel.onGoogleSignInSuccess()
-        }
-    )
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Account", fontWeight = FontWeight.Bold)
@@ -312,7 +313,7 @@ private fun AccountSection(viewModel: GameViewModel) {
                         }
                     }
                     OutlinedButton(
-                        onClick = { googleSignIn.startFlow() },
+                        onClick = onGoogleSignIn,
                         enabled = !loading,
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
