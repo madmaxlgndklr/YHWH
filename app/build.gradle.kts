@@ -6,9 +6,29 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-val localProps = Properties()
-rootProject.file("local.properties").takeIf { it.exists() }
-    ?.inputStream()?.use { localProps.load(it) }
+// Fail fast if local.properties is missing — credentials are required to build
+val localPropsFile = rootProject.file("local.properties")
+if (!localPropsFile.exists()) {
+    throw GradleException(
+        "\n\n[YHWH] local.properties not found at ${localPropsFile.absolutePath}.\n" +
+        "Create it with the following keys before building:\n" +
+        "  SUPABASE_URL=https://<project-ref>.supabase.co\n" +
+        "  SUPABASE_ANON_KEY=<anon-key>\n" +
+        "  GOOGLE_SERVER_CLIENT_ID=<web-client-id>.apps.googleusercontent.com\n"
+    )
+}
+val localProps = Properties().apply { localPropsFile.inputStream().use { load(it) } }
+
+fun requireLocalProp(key: String): String {
+    val value = localProps[key]?.toString()
+    if (value.isNullOrBlank()) {
+        throw GradleException(
+            "\n\n[YHWH] Missing required property '$key' in local.properties.\n" +
+            "Add the following line and rebuild:\n  $key=<value>\n"
+        )
+    }
+    return value
+}
 
 android {
     namespace = "com.madmaxlgndklr.yhwh"
@@ -19,21 +39,24 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.01"
+        versionName = "0.2.12"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL",
-            "\"${localProps["SUPABASE_URL"] ?: ""}\"")
+            "\"${requireLocalProp("SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY",
-            "\"${localProps["SUPABASE_ANON_KEY"] ?: ""}\"")
+            "\"${requireLocalProp("SUPABASE_ANON_KEY")}\"")
         buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID",
-            "\"${localProps["GOOGLE_SERVER_CLIENT_ID"] ?: ""}\"")
+            "\"${requireLocalProp("GOOGLE_SERVER_CLIENT_ID")}\"")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
