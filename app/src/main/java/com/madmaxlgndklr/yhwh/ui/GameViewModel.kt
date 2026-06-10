@@ -5,6 +5,9 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.madmaxlgndklr.yhwh.data.remote.AuthRepository
+import com.madmaxlgndklr.yhwh.data.remote.ConflictState
+import com.madmaxlgndklr.yhwh.data.remote.SyncRepository
+import com.madmaxlgndklr.yhwh.data.remote.SyncResult
 import com.madmaxlgndklr.yhwh.engine.GameEngine
 import com.madmaxlgndklr.yhwh.engine.GameSnapshot
 import com.madmaxlgndklr.yhwh.engine.ResourceType
@@ -34,6 +37,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val engine = GameEngine(scope = viewModelScope)
     private val tutorialPrefs = TutorialPrefs(application)
     val authRepository = AuthRepository()
+    private val syncRepository = SyncRepository(authRepository, saveManager)
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -51,6 +55,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
+
+    private val _conflictState = MutableStateFlow<ConflictState>(ConflictState.None)
+    val conflictState: StateFlow<ConflictState> = _conflictState.asStateFlow()
 
     init {
         val initialTutorialStep = when {
@@ -99,6 +106,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         engine.start()
 
+        // Anonymous sign-in only — no sync for anonymous sessions
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 authRepository.signInAnonymously()
@@ -114,10 +122,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             _authLoading.value = true
             _authError.value = null
-            runCatching { authRepository.signInWithEmail(email, password) }
-                .onSuccess { updateAuthState() }
-                .onFailure { _authError.value = it.message ?: "Sign in failed" }
-            _authLoading.value = false
+            try {
+                authRepository.signInWithEmail(email, password)
+                updateAuthState()
+                performSync()
+            } catch (e: Exception) {
+                _authError.value = e.message ?: "Sign in failed"
+            } finally {
+                _authLoading.value = false
+            }
         }
     }
 
@@ -125,10 +138,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             _authLoading.value = true
             _authError.value = null
-            runCatching { authRepository.signUpWithEmail(email, password) }
-                .onSuccess { updateAuthState() }
-                .onFailure { _authError.value = it.message ?: "Sign up failed" }
-            _authLoading.value = false
+            try {
+                authRepository.signUpWithEmail(email, password)
+                updateAuthState()
+                performSync()
+            } catch (e: Exception) {
+                _authError.value = e.message ?: "Sign up failed"
+            } finally {
+                _authLoading.value = false
+            }
         }
     }
 
@@ -141,10 +159,53 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onGoogleSignInSuccess() {
-        viewModelScope.launch(Dispatchers.IO) { updateAuthState() }
+        viewModelScope.launch(Dispatchers.IO) {
+            updateAuthState()
+            performSync()
+        }
     }
 
     fun clearAuthError() { _authError.value = null }
+
+    /** Called when the player taps "Use this" on either save card in the conflict dialog. */
+    fun resolveConflict(useCloud: Boolean) {
+        val pending = _conflictState.value as? ConflictState.Pending ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            if (useCloud) {
+                val decoded = syncRepository.decodeSaveData(pending.cloud.saveJson)
+                saveManager.save(decoded.snapshot, decoded.lastTickTimestamp)
+                withContext(Dispatchers.Main) {
+                    engine.stop()
+                    engine.restore(decoded.snapshot, 0L)
+                    engine.start()
+                }
+            } else {
+                syncRepository.pushSave(pending.local)
+            }
+            withContext(Dispatchers.Main) {
+                _conflictState.value = ConflictState.Resolved
+            }
+        }
+    }
+
+    private suspend fun performSync() {
+        when (val result = syncRepository.syncOnOpen()) {
+            is SyncResult.CloudRestoreAvailable -> {
+                saveManager.save(result.savedData.snapshot, result.savedData.lastTickTimestamp)
+                withContext(Dispatchers.Main) {
+                    engine.stop()
+                    engine.restore(result.savedData.snapshot, 0L)
+                    engine.start()
+                }
+            }
+            is SyncResult.ConflictDetected -> {
+                withContext(Dispatchers.Main) {
+                    _conflictState.value = ConflictState.Pending(result.local, result.cloud)
+                }
+            }
+            else -> { /* NoAction or PushedToCloud — nothing to do */ }
+        }
+    }
 
     private fun updateAuthState() {
         val user = authRepository.currentUser()
