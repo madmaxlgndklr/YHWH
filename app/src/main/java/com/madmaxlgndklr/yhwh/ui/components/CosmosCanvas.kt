@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import com.madmaxlgndklr.yhwh.engine.EpochType
+import com.madmaxlgndklr.yhwh.engine.EvolutionEvent
 import com.madmaxlgndklr.yhwh.ui.state.CosmosState
 import kotlin.math.cos
 import kotlin.math.sin
@@ -66,9 +68,31 @@ fun CosmosCanvas(
         label = "burst_tick"
     )
 
+    val evolutionBgColor = when {
+        state.mutationLevel < 0.5f -> {
+            val t = state.mutationLevel * 2f
+            Color(
+                red = (0x00 + (0x1A * t).toInt()).coerceIn(0, 255) / 255f,
+                green = (0x1A + (0x14 * t).toInt()).coerceIn(0, 255) / 255f,
+                blue = (0x1A - (0x0A * t).toInt()).coerceIn(0, 255) / 255f,
+                alpha = 1f
+            )
+        }
+        else -> {
+            val t = (state.mutationLevel - 0.5f) * 2f
+            Color(
+                red = (0x1A - (0x14 * t).toInt()).coerceIn(0, 255) / 255f,
+                green = (0x2E + (0x12 * t).toInt()).coerceIn(0, 255) / 255f,
+                blue = (0x10 - (0x08 * t).toInt()).coerceIn(0, 255) / 255f,
+                alpha = 1f
+            )
+        }
+    }
+
     val bgColor by animateColorAsState(
         targetValue = when (state.epoch) {
             EpochType.BIOLOGY -> Color(0xFF001A1A)
+            EpochType.EVOLUTION -> evolutionBgColor
             else -> if (state.planetsFormed) Color(0xFF001830) else Color(0xFF050510)
         },
         animationSpec = tween(durationMillis = 3000),
@@ -91,14 +115,21 @@ fun CosmosCanvas(
         Canvas(modifier = Modifier.fillMaxSize().background(bgColor)) {
             drawStarField(starField)
 
-            if (state.epoch == EpochType.BIOLOGY) {
-                if (state.aminoAcidLevel > 0f) drawOrganicParticles(state.aminoAcidLevel, orbitalAngle)
-                if (state.cellLevel > 0f) drawCellMembranes(state.cellLevel, glowPulse)
-            } else {
-                if (state.matterLevel > 0f) drawMatterParticles(state.matterLevel)
-                if (state.starsFormed) drawStellarGlow(state.starLevel, glowPulse)
-                if (state.starsFormed) drawOrbitalRing(orbitalAngle, state.starLevel)
-                if (state.planetsFormed) drawPlanetRipple(glowPulse)
+            when (state.epoch) {
+                EpochType.BIOLOGY -> {
+                    if (state.aminoAcidLevel > 0f) drawOrganicParticles(state.aminoAcidLevel, orbitalAngle)
+                    if (state.cellLevel > 0f) drawCellMembranes(state.cellLevel, glowPulse)
+                }
+                EpochType.EVOLUTION -> {
+                    drawOrganismParticles(state.speciesLevel, orbitalAngle)
+                    if (state.activeEvent != null) drawEventOverlay(state.activeEvent, glowPulse)
+                }
+                else -> {
+                    if (state.matterLevel > 0f) drawMatterParticles(state.matterLevel)
+                    if (state.starsFormed) drawStellarGlow(state.starLevel, glowPulse)
+                    if (state.starsFormed) drawOrbitalRing(orbitalAngle, state.starLevel)
+                    if (state.planetsFormed) drawPlanetRipple(glowPulse)
+                }
             }
 
             @Suppress("UNUSED_EXPRESSION") burstTick
@@ -246,5 +277,47 @@ private fun DrawScope.drawBurst(burst: TapBurst, now: Long) {
             radius = radius,
             center = Offset(px, py)
         )
+    }
+}
+
+private fun DrawScope.drawOrganismParticles(speciesLevel: Float, orbitalAngle: Float) {
+    val baseCount = (speciesLevel * 30).toInt().coerceAtLeast(3)
+    val rng = Random(seed = 77L)
+    repeat(baseCount) { i ->
+        val baseX = rng.nextFloat()
+        val baseY = rng.nextFloat()
+        val driftX = sin((orbitalAngle + i * 41f) * Math.PI.toFloat() / 180f) * 0.015f
+        val driftY = cos((orbitalAngle + i * 29f) * Math.PI.toFloat() / 180f) * 0.015f
+        val x = (baseX + driftX).coerceIn(0f, 1f) * size.width
+        val y = (baseY + driftY).coerceIn(0f, 1f) * size.height
+
+        val sizeVariance = if (speciesLevel > 0.3f) rng.nextFloat() * 5f + 2f else 2.5f
+        val alpha = (0.4f + speciesLevel * 0.4f).coerceIn(0f, 1f)
+
+        drawOval(
+            color = Color(0xFF6DBF67).copy(alpha = alpha),
+            topLeft = Offset(x - sizeVariance, y - sizeVariance * 0.6f),
+            size = Size(sizeVariance * 2f, sizeVariance * 1.2f)
+        )
+    }
+}
+
+private fun DrawScope.drawEventOverlay(event: EvolutionEvent, pulse: Float) {
+    when (event) {
+        EvolutionEvent.ICE_AGE ->
+            drawRect(
+                color = Color(0xFF88CCFF).copy(alpha = 0.12f + pulse * 0.06f),
+                size = size
+            )
+        EvolutionEvent.ASTEROID_IMPACT ->
+            drawRect(
+                color = Color(0xFFFF4444).copy(alpha = 0.08f + pulse * 0.04f),
+                size = size
+            )
+        EvolutionEvent.VOLCANIC_WINTER ->
+            drawRect(
+                color = Color(0xFF886644).copy(alpha = 0.15f + pulse * 0.05f),
+                size = size
+            )
     }
 }
