@@ -13,5 +13,9 @@ enum class ResourceType(val displayName: String, val symbol: String) {
     AMINO_ACIDS("Amino Acids", "🧪"),
     PROTEINS("Proteins", "🔗"),
     CELLS("Cells", "🔬"),
-    ORGANISMS("Organisms", "🦠")
+    ORGANISMS("Organisms", "🦠"),
+    GENES("Genes", "🧬"),
+    MUTATIONS("Mutations", "🔀"),
+    SPECIES("Species", "🦎"),
+    DOMINANCE("Dominance", "👑")
 }

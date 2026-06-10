@@ -1,5 +1,6 @@
 package com.madmaxlgndklr.yhwh.ui.state
 
+import com.madmaxlgndklr.yhwh.engine.EvolutionEvent
 import com.madmaxlgndklr.yhwh.engine.GeneratorSnapshot
 import com.madmaxlgndklr.yhwh.engine.UpgradeSnapshot
 
@@ -22,5 +23,7 @@ data class GameUiState(
     val offlineEarningsSummary: String? = null,
     val showEpochTransition: Boolean = false,
     val transitionMessage: String = "",
-    val tutorialStep: Int = 0
+    val tutorialStep: Int = 0,
+    val activeEvent: EvolutionEvent? = null,
+    val eventTicksRemaining: Int = 0
 )

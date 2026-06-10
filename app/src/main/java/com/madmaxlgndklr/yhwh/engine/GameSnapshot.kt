@@ -41,5 +41,7 @@ data class GameSnapshot(
     /** Events generated this tick only (not cumulative). */
     val events: List<GameEvent>,
     /** Cumulative total ever produced for each resource, across all epochs. Persisted with save. */
-    val lifetimeTotals: Map<String, BigDouble> = emptyMap()
+    val lifetimeTotals: Map<String, BigDouble> = emptyMap(),
+    val activeEvent: EvolutionEvent? = null,
+    val eventTicksRemaining: Int = 0
 )

@@ -1,5 +1,6 @@
 package com.madmaxlgndklr.yhwh.ui.state
 
+import com.madmaxlgndklr.yhwh.engine.EvolutionEvent
 import com.madmaxlgndklr.yhwh.engine.EpochType
 
 data class CosmosState(
@@ -9,5 +10,8 @@ data class CosmosState(
     val starsFormed: Boolean = false,
     val planetsFormed: Boolean = false,
     val aminoAcidLevel: Float = 0f,
-    val cellLevel: Float = 0f
+    val cellLevel: Float = 0f,
+    val mutationLevel: Float = 0f,
+    val speciesLevel: Float = 0f,
+    val activeEvent: EvolutionEvent? = null
 )
