@@ -88,7 +88,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             engine.snapshot.filterNotNull().collect { snapshot ->
-                val newUiState = snapshot.toUiState(engine.snapshotAllResources())
+                val newUiState = snapshot.toUiState()
                 val showTransition = snapshot.epochProgress >= 1f &&
                         !epochTransitionAcknowledged &&
                         !_uiState.value.showEpochTransition
@@ -269,16 +269,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun GameSnapshot.toUiState(worldResources: Map<String, BigDouble>): GameUiState {
+    private fun GameSnapshot.toUiState(): GameUiState {
         val resourceDisplays = resources.mapNotNull { (typeName, amount) ->
             runCatching { ResourceType.valueOf(typeName) }.getOrNull()?.let { type ->
                 ResourceDisplay(symbol = type.symbol, displayName = type.displayName, value = amount.toDisplayString())
             }
         }
-        val allResourceDisplays = worldResources.mapNotNull { (typeName, amount) ->
-            if (amount > BigDouble.ZERO) {
+        val allResourceDisplays = lifetimeTotals.mapNotNull { (typeName, total) ->
+            if (total > BigDouble.ZERO) {
                 runCatching { ResourceType.valueOf(typeName) }.getOrNull()?.let { type ->
-                    ResourceDisplay(symbol = type.symbol, displayName = type.displayName, value = amount.toDisplayString())
+                    ResourceDisplay(symbol = type.symbol, displayName = type.displayName, value = total.toDisplayString())
                 }
             } else null
         }

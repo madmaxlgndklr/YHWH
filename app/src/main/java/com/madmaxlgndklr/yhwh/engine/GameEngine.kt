@@ -36,11 +36,13 @@ class GameEngine(
 
     private var activeSystem: GameSystem? = null
 
-    /** Registers [system] and sets it as the active snapshot source. In Phase 1 only one system
-     *  is registered per epoch; re-registering replaces the active snapshot source. */
+    /** Cumulative total of every resource ever produced, across all epochs. Persisted in snapshot. */
+    private val lifetimeTotals: MutableMap<String, BigDouble> = mutableMapOf()
+
+    /** Registers [system] and sets it as the active snapshot source. */
     fun registerSystem(system: GameSystem) {
         systems.add(system)
-        activeSystem = system  // last registered wins; callers set epoch-appropriate system
+        activeSystem = system
     }
 
     /** Call on fresh game start. Initializes world via each system and emits first snapshot. */
@@ -55,17 +57,13 @@ class GameEngine(
      * as a single batch tick.
      */
     fun restore(savedSnapshot: GameSnapshot, missedTicks: Long) {
-        // Re-initialize world with default entity layout
         systems.forEach { it.initialize(world) }
-        // Patch resource amounts from saved state
         savedSnapshot.resources.forEach { (typeName, amount) ->
             world.get<ResourceComponent>("res_${typeName.lowercase()}")?.amount = amount
         }
-        // Patch purchased upgrade flags
         savedSnapshot.upgrades.filter { it.purchased }.forEach { upgSnap ->
             world.get<UpgradeComponent>(upgSnap.id)?.purchased = true
         }
-        // Restore generator state (level, productionRate, unlocked) from snapshot
         savedSnapshot.generators.forEach { genSnap ->
             world.get<GeneratorComponent>(genSnap.id)?.let { gen ->
                 gen.level = genSnap.level
@@ -73,13 +71,18 @@ class GameEngine(
                 gen.unlocked = genSnap.unlocked
             }
         }
-        // Let any Restorable system sync internal state from the restored world
         systems.filterIsInstance<Restorable>().forEach { it.syncStateFromWorld(world) }
+
+        // Restore lifetime totals from the saved snapshot
+        lifetimeTotals.clear()
+        lifetimeTotals.putAll(savedSnapshot.lifetimeTotals)
+
         tickCount = savedSnapshot.tick
-        // Apply offline progress as a single batch tick
         val clampedDelta = missedTicks.coerceAtMost(maxOfflineTicks)
         if (clampedDelta > 0L) {
+            val before = snapshotAllResources()
             activeSystem?.tick(world, clampedDelta)
+            accumulateGains(before)
             tickCount += clampedDelta
         }
         emitSnapshot()
@@ -89,7 +92,9 @@ class GameEngine(
         tickJob = engineScope.launch {
             while (true) {
                 delay(tickIntervalMs)
+                val before = snapshotAllResources()
                 activeSystem?.tick(world, 1L)
+                accumulateGains(before)
                 tickCount++
                 emitSnapshot()
                 if (tickCount % saveEveryNTicks == 0L) {
@@ -115,13 +120,17 @@ class GameEngine(
 
     /** Route a player tap to the active system. */
     fun onPlayerTap() {
+        val before = snapshotAllResources()
         (activeSystem as? PlayerActionHandler)?.onTap(world)
+        accumulateGains(before)
         emitSnapshot()
     }
 
     /** Route an upgrade purchase to the active system. */
     fun purchaseUpgrade(upgradeId: String) {
+        val before = snapshotAllResources()
         (activeSystem as? PlayerActionHandler)?.purchaseUpgrade(world, upgradeId)
+        accumulateGains(before)
         emitSnapshot()
     }
 
@@ -131,9 +140,18 @@ class GameEngine(
         emitSnapshot()
     }
 
+    private fun accumulateGains(before: Map<String, BigDouble>) {
+        snapshotAllResources().forEach { (typeName, afterAmount) ->
+            val gained = afterAmount - (before[typeName] ?: BigDouble.ZERO)
+            if (gained > BigDouble.ZERO) {
+                lifetimeTotals[typeName] = (lifetimeTotals[typeName] ?: BigDouble.ZERO) + gained
+            }
+        }
+    }
+
     private fun emitSnapshot() {
         val snap = activeSystem?.toSnapshot(world, tickCount) ?: return
-        _snapshot.value = snap
+        _snapshot.value = snap.copy(lifetimeTotals = lifetimeTotals.toMap())
     }
 }
 

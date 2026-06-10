@@ -39,5 +39,7 @@ data class GameSnapshot(
     /** 0f–1f. Reaches 1.0 when epoch win condition is met. */
     val epochProgress: Float,
     /** Events generated this tick only (not cumulative). */
-    val events: List<GameEvent>
+    val events: List<GameEvent>,
+    /** Cumulative total ever produced for each resource, across all epochs. Persisted with save. */
+    val lifetimeTotals: Map<String, BigDouble> = emptyMap()
 )
