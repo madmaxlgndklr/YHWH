@@ -9,5 +9,9 @@ enum class ResourceType(val displayName: String, val symbol: String) {
     HYDROGEN("Hydrogen", "H"),
     STARS("Stars", "★"),
     ACCRETION_DISKS("Accretion Disks", "◎"),
-    PLANETS("Planets", "♁")
+    PLANETS("Planets", "♁"),
+    AMINO_ACIDS("Amino Acids", "🧪"),
+    PROTEINS("Proteins", "🔗"),
+    CELLS("Cells", "🔬"),
+    ORGANISMS("Organisms", "🦠")
 }

@@ -1,6 +1,5 @@
 package com.madmaxlgndklr.yhwh.engine
 
-import com.madmaxlgndklr.yhwh.systems.CosmologySystem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -73,8 +72,8 @@ class GameEngine(
                 gen.unlocked = genSnap.unlocked
             }
         }
-        // Let CosmologySystem sync any internal state from the restored world
-        systems.filterIsInstance<CosmologySystem>().forEach { it.syncStateFromWorld(world) }
+        // Let any Restorable system sync internal state from the restored world
+        systems.filterIsInstance<Restorable>().forEach { it.syncStateFromWorld(world) }
         tickCount = savedSnapshot.tick
         // Apply offline progress as a single batch tick
         val clampedDelta = missedTicks.coerceAtMost(maxOfflineTicks)
@@ -100,6 +99,14 @@ class GameEngine(
     }
 
     fun stop() { tickJob?.cancel() }
+
+    /** Transitions the game to the next epoch by registering and activating [nextSystem]. */
+    fun advanceEpoch(nextSystem: GameSystem) {
+        systems.add(nextSystem)
+        activeSystem = nextSystem
+        nextSystem.initialize(world)
+        emitSnapshot()
+    }
 
     /** Route a player tap to all systems that implement [PlayerActionHandler]. */
     fun onPlayerTap() {

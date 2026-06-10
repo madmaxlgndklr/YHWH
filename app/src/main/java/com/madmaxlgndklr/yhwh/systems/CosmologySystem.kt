@@ -8,7 +8,7 @@ import kotlin.math.pow
  * Implements all Cosmology epoch game logic.
  * Implements [GameSystem] (tick loop + snapshot) and [PlayerActionHandler] (player actions).
  */
-class CosmologySystem : GameSystem, PlayerActionHandler {
+class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
 
     companion object {
         const val KEY_RES_ENERGY = "res_energy"
@@ -235,7 +235,7 @@ class CosmologySystem : GameSystem, PlayerActionHandler {
     }
 
     /** Called after restore() has patched all world state. Syncs instance flags from world. */
-    fun syncStateFromWorld(world: World) {
+    override fun syncStateFromWorld(world: World) {
         val stars = world.get<ResourceComponent>(KEY_RES_STARS)?.amount ?: BigDouble.ZERO
         val planets = world.get<ResourceComponent>(KEY_RES_PLANETS)?.amount ?: BigDouble.ZERO
         firstStarFired = stars > BigDouble.ZERO
