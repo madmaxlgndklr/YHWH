@@ -7,11 +7,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.madmaxlgndklr.yhwh.ui.GameViewModel
 import com.madmaxlgndklr.yhwh.ui.screen.GameScreen
+import com.madmaxlgndklr.yhwh.ui.screen.ProfileScreen
 import com.madmaxlgndklr.yhwh.ui.screen.SettingsScreen
 
 private object Routes {
     const val GAME = "game"
     const val SETTINGS = "settings"
+    const val PROFILE = "profile"
 }
 
 @Composable
@@ -27,7 +29,16 @@ fun AppNavigation() {
             )
         }
         composable(Routes.SETTINGS) {
-            SettingsScreen(viewModel = gameViewModel)
+            SettingsScreen(
+                viewModel = gameViewModel,
+                onNavigateToProfile = { navController.navigate(Routes.PROFILE) }
+            )
+        }
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                viewModel = gameViewModel,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }
