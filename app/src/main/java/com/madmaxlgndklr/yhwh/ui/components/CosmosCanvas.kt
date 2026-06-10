@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import com.madmaxlgndklr.yhwh.engine.EpochType
 import com.madmaxlgndklr.yhwh.ui.state.CosmosState
 import kotlin.math.cos
 import kotlin.math.sin
@@ -21,19 +22,12 @@ import kotlin.random.Random
 
 private data class Star(val x: Float, val y: Float, val radius: Float, val alpha: Float)
 
-/** A single tap-burst effect at [position], animated over [BURST_DURATION_MS]. */
 private data class TapBurst(val position: Offset, val startTime: Long)
 
 private const val BURST_DURATION_MS = 400L
 private const val BURST_PARTICLE_COUNT = 7
 private const val BURST_MAX_RADIUS = 80f
 
-/**
- * Animated canvas backdrop for the current epoch.
- *
- * @param onTap Optional callback triggered on each tap. When non-null, the canvas
- *              also shows a particle burst at the tap position.
- */
 @Composable
 fun CosmosCanvas(
     state: CosmosState,
@@ -62,7 +56,6 @@ fun CosmosCanvas(
         ),
         label = "glow_pulse"
     )
-    // Drive burst animation recompositions
     val burstTick by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -74,12 +67,14 @@ fun CosmosCanvas(
     )
 
     val bgColor by animateColorAsState(
-        targetValue = if (state.planetsFormed) Color(0xFF001830) else Color(0xFF050510),
+        targetValue = when (state.epoch) {
+            EpochType.BIOLOGY -> Color(0xFF001A1A)
+            else -> if (state.planetsFormed) Color(0xFF001830) else Color(0xFF050510)
+        },
         animationSpec = tween(durationMillis = 3000),
         label = "bg_color"
     )
 
-    // Clean up expired bursts
     val now = System.currentTimeMillis()
     bursts.removeAll { now - it.startTime > BURST_DURATION_MS }
 
@@ -95,11 +90,17 @@ fun CosmosCanvas(
     Box(modifier = modifier.then(tapModifier)) {
         Canvas(modifier = Modifier.fillMaxSize().background(bgColor)) {
             drawStarField(starField)
-            if (state.matterLevel > 0f) drawMatterParticles(state.matterLevel)
-            if (state.starsFormed) drawStellarGlow(state.starLevel, glowPulse)
-            if (state.starsFormed) drawOrbitalRing(orbitalAngle, state.starLevel)
-            if (state.planetsFormed) drawPlanetRipple(glowPulse)
-            // Read burstTick to force recompose each animation frame
+
+            if (state.epoch == EpochType.BIOLOGY) {
+                if (state.aminoAcidLevel > 0f) drawOrganicParticles(state.aminoAcidLevel, orbitalAngle)
+                if (state.cellLevel > 0f) drawCellMembranes(state.cellLevel, glowPulse)
+            } else {
+                if (state.matterLevel > 0f) drawMatterParticles(state.matterLevel)
+                if (state.starsFormed) drawStellarGlow(state.starLevel, glowPulse)
+                if (state.starsFormed) drawOrbitalRing(orbitalAngle, state.starLevel)
+                if (state.planetsFormed) drawPlanetRipple(glowPulse)
+            }
+
             @Suppress("UNUSED_EXPRESSION") burstTick
             val drawNow = System.currentTimeMillis()
             bursts.forEach { burst -> drawBurst(burst, drawNow) }
@@ -193,6 +194,39 @@ private fun DrawScope.drawPlanetRipple(pulse: Float) {
         radius = size.minDimension * 0.08f,
         center = Offset(cx, cy)
     )
+}
+
+private fun DrawScope.drawOrganicParticles(aminoAcidLevel: Float, orbitalAngle: Float) {
+    val count = (aminoAcidLevel * 40).toInt().coerceAtLeast(1)
+    val rng = Random(seed = 13L)
+    repeat(count) { i ->
+        val baseX = rng.nextFloat()
+        val baseY = rng.nextFloat()
+        val driftX = sin((orbitalAngle + i * 37f) * Math.PI.toFloat() / 180f) * 0.02f
+        val driftY = cos((orbitalAngle + i * 23f) * Math.PI.toFloat() / 180f) * 0.02f
+        val x = (baseX + driftX).coerceIn(0f, 1f) * size.width
+        val y = (baseY + driftY).coerceIn(0f, 1f) * size.height
+        drawCircle(
+            color = Color(0xFF44BB66).copy(alpha = aminoAcidLevel * 0.5f),
+            radius = rng.nextFloat() * 3f + 1.5f,
+            center = Offset(x, y)
+        )
+    }
+}
+
+private fun DrawScope.drawCellMembranes(cellLevel: Float, pulse: Float) {
+    val rng = Random(seed = 99L)
+    repeat(4) { i ->
+        val cx = (rng.nextFloat() * 0.6f + 0.2f) * size.width
+        val cy = (rng.nextFloat() * 0.6f + 0.2f) * size.height
+        val radius = size.minDimension * (0.06f + i * 0.03f) * (0.8f + pulse * 0.4f)
+        drawCircle(
+            color = Color(0xFF004040).copy(alpha = cellLevel * pulse * 0.6f),
+            radius = radius,
+            center = Offset(cx, cy),
+            style = Stroke(width = 2f)
+        )
+    }
 }
 
 private fun DrawScope.drawBurst(burst: TapBurst, now: Long) {
