@@ -8,12 +8,15 @@ import com.madmaxlgndklr.yhwh.data.remote.AuthRepository
 import com.madmaxlgndklr.yhwh.data.remote.ConflictState
 import com.madmaxlgndklr.yhwh.data.remote.SyncRepository
 import com.madmaxlgndklr.yhwh.data.remote.SyncResult
+import com.madmaxlgndklr.yhwh.engine.EpochType
 import com.madmaxlgndklr.yhwh.engine.GameEngine
 import com.madmaxlgndklr.yhwh.engine.GameSnapshot
+import com.madmaxlgndklr.yhwh.engine.GameSystem
 import com.madmaxlgndklr.yhwh.engine.ResourceType
 import com.madmaxlgndklr.yhwh.engine.math.BigDouble
 import com.madmaxlgndklr.yhwh.persistence.SaveData
 import com.madmaxlgndklr.yhwh.persistence.SaveManager
+import com.madmaxlgndklr.yhwh.systems.BiologySystem
 import com.madmaxlgndklr.yhwh.systems.CosmologySystem
 import com.madmaxlgndklr.yhwh.ui.state.CosmosState
 import com.madmaxlgndklr.yhwh.ui.state.GameUiState
@@ -70,7 +73,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         _uiState.value = _uiState.value.copy(tutorialStep = initialTutorialStep)
 
-        engine.registerSystem(CosmologySystem())
         engine.onSaveDue = { snapshot ->
             withContext(Dispatchers.IO) {
                 val ts = System.currentTimeMillis()
@@ -102,6 +104,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val saved = saveManager.load()
+        val system: GameSystem = when (saved?.snapshot?.epoch) {
+            EpochType.BIOLOGY -> BiologySystem()
+            else -> CosmologySystem()
+        }
+        engine.registerSystem(system)
         if (saved != null) {
             val missed = saveManager.computeMissedTicks(saved.lastTickTimestamp)
             if (missed > 0) {
@@ -232,6 +239,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissEpochTransition() {
         epochTransitionAcknowledged = true
         _uiState.value = _uiState.value.copy(showEpochTransition = false)
+        when (engine.snapshot.value?.epoch) {
+            EpochType.COSMOLOGY -> engine.advanceEpoch(BiologySystem())
+            else -> { /* future epochs */ }
+        }
     }
 
     fun dismissOfflineSummary() {
@@ -272,16 +283,33 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun GameSnapshot.toCosmosState(): CosmosState {
-        val matter = resources[ResourceType.MATTER.name] ?: BigDouble.ZERO
-        val stars = resources[ResourceType.STARS.name] ?: BigDouble.ZERO
-        val planets = resources[ResourceType.PLANETS.name] ?: BigDouble.ZERO
-        return CosmosState(
-            epoch = epoch,
-            matterLevel = (matter.toDouble() / CosmologySystem.MATTER_VISUAL_THRESHOLD).toFloat().coerceIn(0f, 1f),
-            starLevel = (stars.toDouble() / CosmologySystem.STAR_VISUAL_THRESHOLD).toFloat().coerceIn(0f, 1f),
-            starsFormed = stars > BigDouble.ZERO,
-            planetsFormed = planets >= BigDouble.ONE
-        )
+        return when (epoch) {
+            EpochType.BIOLOGY -> {
+                val aminoAcids = resources[ResourceType.AMINO_ACIDS.name] ?: BigDouble.ZERO
+                val cells = resources[ResourceType.CELLS.name] ?: BigDouble.ZERO
+                CosmosState(
+                    epoch = epoch,
+                    aminoAcidLevel = (aminoAcids.toDouble() / BiologySystem.AMINO_ACID_VISUAL_THRESHOLD)
+                        .toFloat().coerceIn(0f, 1f),
+                    cellLevel = (cells.toDouble() / BiologySystem.CELL_VISUAL_THRESHOLD)
+                        .toFloat().coerceIn(0f, 1f)
+                )
+            }
+            else -> {
+                val matter = resources[ResourceType.MATTER.name] ?: BigDouble.ZERO
+                val stars = resources[ResourceType.STARS.name] ?: BigDouble.ZERO
+                val planets = resources[ResourceType.PLANETS.name] ?: BigDouble.ZERO
+                CosmosState(
+                    epoch = epoch,
+                    matterLevel = (matter.toDouble() / CosmologySystem.MATTER_VISUAL_THRESHOLD)
+                        .toFloat().coerceIn(0f, 1f),
+                    starLevel = (stars.toDouble() / CosmologySystem.STAR_VISUAL_THRESHOLD)
+                        .toFloat().coerceIn(0f, 1f),
+                    starsFormed = stars > BigDouble.ZERO,
+                    planetsFormed = planets >= BigDouble.ONE
+                )
+            }
+        }
     }
 
     private fun formatOfflineTime(ticks: Long): String = when {
