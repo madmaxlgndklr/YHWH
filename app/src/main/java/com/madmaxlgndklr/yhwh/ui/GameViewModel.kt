@@ -47,7 +47,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val saveManager = SaveManager(saveFile)
     private val metaFile = File(application.filesDir, "yhwh_meta.json")
     private val metaSaveManager = MetaSaveManager(metaFile)
-    private var meta = metaSaveManager.load()
+    @Volatile private var meta = metaSaveManager.load()
     private val engine = GameEngine(scope = viewModelScope)
     private val tutorialPrefs = TutorialPrefs(application)
     val authRepository = AuthRepository()
@@ -289,14 +289,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val newMeta = MetaSave(restartCount = meta.restartCount + 1, seedBonus = newBonus)
         viewModelScope.launch(Dispatchers.IO) {
             metaSaveManager.save(newMeta)
-            saveFile.delete()
+            if (!saveFile.delete()) Log.e("GameViewModel", "restartGame: failed to delete save file")
+            withContext(Dispatchers.Main) {
+                meta = newMeta
+                epochTransitionAcknowledged = false
+                engine.stop()
+                engine.resetAndRegister(CosmologySystem().also { it.seedBonus = newMeta.seedBonus })
+                engine.initNewGame()
+                engine.start()
+            }
         }
-        meta = newMeta
-        epochTransitionAcknowledged = false
-        engine.stop()
-        engine.resetAndRegister(CosmologySystem().also { it.seedBonus = newBonus })
-        engine.initNewGame()
-        engine.start()
     }
 
     fun onTutorialNext() {
