@@ -45,12 +45,16 @@ class GameEngine(
         activeSystem = system
     }
 
-    /** Clears all systems, creates a fresh World, zeros totals, and registers [system] for a clean restart. */
+    /**
+     * Clears all systems, creates a fresh World, zeros totals, and registers [system].
+     * Caller must call [stop] before this to avoid data races with the tick coroutine.
+     */
     fun resetAndRegister(system: GameSystem) {
         systems.clear()
         world = World()
         tickCount = 0L
         lifetimeTotals.clear()
+        _snapshot.value = null
         systems.add(system)
         activeSystem = system
     }
