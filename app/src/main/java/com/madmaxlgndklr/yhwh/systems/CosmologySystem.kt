@@ -254,8 +254,8 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
 
     /** Called after restore() has patched all world state. Syncs instance flags from world. */
     override fun syncStateFromWorld(world: World) {
-        globalMultiplier = if (seedBonus != null)
-            BigDouble.of(seedBonus!!.globalMultiplier.toDouble()) else BigDouble.ONE
+        val bonus = seedBonus
+        globalMultiplier = if (bonus != null) BigDouble.of(bonus.globalMultiplier.toDouble()) else BigDouble.ONE
         val stars = world.get<ResourceComponent>(KEY_RES_STARS)?.amount ?: BigDouble.ZERO
         val planets = world.get<ResourceComponent>(KEY_RES_PLANETS)?.amount ?: BigDouble.ZERO
         firstStarFired = stars > BigDouble.ZERO
