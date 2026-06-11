@@ -31,7 +31,8 @@ fun AppNavigation() {
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 viewModel = gameViewModel,
-                onNavigateToProfile = { navController.navigate(Routes.PROFILE) }
+                onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
+                onNavigateToGame = { navController.popBackStack(Routes.GAME, inclusive = false) }
             )
         }
         composable(Routes.PROFILE) {

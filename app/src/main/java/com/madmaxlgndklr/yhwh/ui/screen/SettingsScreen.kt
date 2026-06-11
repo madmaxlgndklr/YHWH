@@ -17,9 +17,26 @@ import com.madmaxlgndklr.yhwh.ui.GameViewModel
 @Composable
 fun SettingsScreen(
     viewModel: GameViewModel,
-    onNavigateToProfile: () -> Unit
+    onNavigateToProfile: () -> Unit,
+    onNavigateToGame: () -> Unit
 ) {
     val authState by viewModel.authState.collectAsStateWithLifecycle()
+    var showRestartDialog by remember { mutableStateOf(false) }
+    val bonus = remember { viewModel.computedSeedBonus() }
+
+    val bonusText = buildString {
+        val pct = ((bonus.globalMultiplier - 1.0f) * 100).toInt()
+        if (pct > 0) append("+${pct}% production")
+        if (bonus.startingEnergy > 0) {
+            if (isNotEmpty()) append(" · ")
+            append("${bonus.startingEnergy.toInt()} Energy")
+        }
+        if (bonus.startingMatter > 0) {
+            if (isNotEmpty()) append(" · ")
+            append("${bonus.startingMatter.toInt()} Matter")
+        }
+        if (isEmpty()) append("No bonus yet — play further to earn one")
+    }
 
     Column(
         modifier = Modifier
@@ -84,5 +101,53 @@ fun SettingsScreen(
                 }
             )
         }
+
+        HorizontalDivider()
+
+        // Restart Game row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showRestartDialog = true }
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Restart Game", fontSize = 15.sp)
+                Text(
+                    bonusText,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+
+    if (showRestartDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestartDialog = false },
+            title = { Text("Start a new game?") },
+            text = {
+                Text(
+                    "Your progress earns: $bonusText\n\nThis cannot be undone.",
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.restartGame()
+                    showRestartDialog = false
+                    onNavigateToGame()
+                }) {
+                    Text("Restart")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRestartDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
