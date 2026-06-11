@@ -25,7 +25,7 @@ class GameEngine(
     scope: CoroutineScope? = null
 ) {
     private val engineScope = scope ?: CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private val world = World()
+    private var world = World()
     private val systems = mutableListOf<GameSystem>()
     private var tickCount = 0L
     private var tickJob: Job? = null
@@ -41,6 +41,16 @@ class GameEngine(
 
     /** Registers [system] and sets it as the active snapshot source. */
     fun registerSystem(system: GameSystem) {
+        systems.add(system)
+        activeSystem = system
+    }
+
+    /** Clears all systems, creates a fresh World, zeros totals, and registers [system] for a clean restart. */
+    fun resetAndRegister(system: GameSystem) {
+        systems.clear()
+        world = World()
+        tickCount = 0L
+        lifetimeTotals.clear()
         systems.add(system)
         activeSystem = system
     }
