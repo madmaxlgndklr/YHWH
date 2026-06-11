@@ -25,5 +25,7 @@ data class GameUiState(
     val transitionMessage: String = "",
     val tutorialStep: Int = 0,
     val activeEvent: EvolutionEvent? = null,
-    val eventTicksRemaining: Int = 0
+    val eventTicksRemaining: Int = 0,
+    val restartCount: Int = 0,
+    val activeSeedMultiplier: Float = 1.0f
 )

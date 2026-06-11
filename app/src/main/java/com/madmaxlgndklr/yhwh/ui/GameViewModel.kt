@@ -14,7 +14,10 @@ import com.madmaxlgndklr.yhwh.engine.GameEngine
 import com.madmaxlgndklr.yhwh.engine.GameSnapshot
 import com.madmaxlgndklr.yhwh.engine.GameSystem
 import com.madmaxlgndklr.yhwh.engine.ResourceType
+import com.madmaxlgndklr.yhwh.engine.SeedBonus
 import com.madmaxlgndklr.yhwh.engine.math.BigDouble
+import com.madmaxlgndklr.yhwh.persistence.MetaSave
+import com.madmaxlgndklr.yhwh.persistence.MetaSaveManager
 import com.madmaxlgndklr.yhwh.persistence.SaveData
 import com.madmaxlgndklr.yhwh.persistence.SaveManager
 import com.madmaxlgndklr.yhwh.systems.BiologySystem
@@ -30,6 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.floor
 import java.io.File
 
 sealed class AuthState {
@@ -41,6 +45,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val saveFile = File(application.filesDir, "yhwh_save.json")
     private val saveManager = SaveManager(saveFile)
+    private val metaFile = File(application.filesDir, "yhwh_meta.json")
+    private val metaSaveManager = MetaSaveManager(metaFile)
+    private var meta = metaSaveManager.load()
     private val engine = GameEngine(scope = viewModelScope)
     private val tutorialPrefs = TutorialPrefs(application)
     val authRepository = AuthRepository()
@@ -112,7 +119,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val system: GameSystem = when (saved?.snapshot?.epoch) {
             EpochType.BIOLOGY -> BiologySystem()
             EpochType.EVOLUTION -> EvolutionSystem()
-            else -> CosmologySystem()
+            else -> CosmologySystem().also { it.seedBonus = meta.seedBonus }
         }
         engine.registerSystem(system)
         if (saved != null) {
@@ -257,6 +264,41 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(offlineEarningsSummary = null)
     }
 
+    fun computedSeedBonus(): SeedBonus {
+        val snap = engine.snapshot.value ?: return meta.seedBonus
+        val epochMultiplier = when (snap.epoch) {
+            EpochType.COSMOLOGY -> 1.00f
+            EpochType.BIOLOGY -> 1.15f
+            EpochType.EVOLUTION -> 1.35f
+            EpochType.CIVILIZATION -> 1.65f
+            EpochType.INTERSTELLAR -> 2.00f
+        }
+        val lifetimeEnergy = snap.lifetimeTotals[ResourceType.ENERGY.name]?.toDouble() ?: 0.0
+        val lifetimeMatter = snap.lifetimeTotals[ResourceType.MATTER.name]?.toDouble() ?: 0.0
+        val newStartingEnergy = (meta.seedBonus.startingEnergy +
+            floor(lifetimeEnergy / 1000.0) * 10.0).coerceAtMost(500.0)
+        val newStartingMatter = (meta.seedBonus.startingMatter +
+            floor(lifetimeMatter / 1000.0) * 5.0).coerceAtMost(250.0)
+        val newMultiplier = (meta.seedBonus.globalMultiplier + (epochMultiplier - 1.0f))
+            .coerceAtLeast(1.0f)
+        return SeedBonus(newMultiplier, newStartingEnergy, newStartingMatter)
+    }
+
+    fun restartGame() {
+        val newBonus = computedSeedBonus()
+        val newMeta = MetaSave(restartCount = meta.restartCount + 1, seedBonus = newBonus)
+        viewModelScope.launch(Dispatchers.IO) {
+            metaSaveManager.save(newMeta)
+            saveFile.delete()
+        }
+        meta = newMeta
+        epochTransitionAcknowledged = false
+        engine.stop()
+        engine.resetAndRegister(CosmologySystem().also { it.seedBonus = newBonus })
+        engine.initNewGame()
+        engine.start()
+    }
+
     fun onTutorialNext() {
         val next = _uiState.value.tutorialStep + 1
         if (next >= 4) tutorialPrefs.completed = true
@@ -306,7 +348,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             upgrades = upgrades,
             recentEvents = events.map { it.message }.takeLast(5),
             activeEvent = activeEvent,
-            eventTicksRemaining = eventTicksRemaining
+            eventTicksRemaining = eventTicksRemaining,
+            restartCount = meta.restartCount,
+            activeSeedMultiplier = meta.seedBonus.globalMultiplier
         )
     }
 
