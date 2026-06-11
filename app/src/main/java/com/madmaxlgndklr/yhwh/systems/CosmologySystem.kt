@@ -2,7 +2,6 @@ package com.madmaxlgndklr.yhwh.systems
 
 import com.madmaxlgndklr.yhwh.engine.*
 import com.madmaxlgndklr.yhwh.engine.math.BigDouble
-import com.madmaxlgndklr.yhwh.engine.SeedBonus
 import kotlin.math.pow
 
 /**
