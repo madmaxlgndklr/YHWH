@@ -2,6 +2,7 @@ package com.madmaxlgndklr.yhwh.systems
 
 import com.madmaxlgndklr.yhwh.engine.*
 import com.madmaxlgndklr.yhwh.engine.math.BigDouble
+import com.madmaxlgndklr.yhwh.engine.SeedBonus
 import kotlin.math.pow
 
 /**
@@ -43,6 +44,9 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
     private var collapseCost = INITIAL_COLLAPSE_COST
     private var firstStarFired = false
     private var firstPlanetFired = false
+    private var globalMultiplier: BigDouble = BigDouble.ONE
+    var seedBonus: SeedBonus? = null
+
 
     override fun initialize(world: World) {
         // Resources
@@ -115,6 +119,20 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
                 multiplier = BigDouble.of(0.5)
             )
         ))
+
+        val bonus = seedBonus
+        if (bonus != null) {
+            val energyRes = world.get<ResourceComponent>(KEY_RES_ENERGY)
+            if (energyRes != null) {
+                energyRes.amount = BigDouble.of(bonus.startingEnergy)
+            }
+            val matterRes = world.get<ResourceComponent>(KEY_RES_MATTER)
+            if (matterRes != null) {
+                matterRes.amount = BigDouble.of(bonus.startingMatter)
+            }
+            val newMultiplier = BigDouble.of(bonus.globalMultiplier.toDouble())
+            globalMultiplier = newMultiplier
+        }
     }
 
     override fun tick(world: World, delta: Long): List<GameEvent> {
@@ -123,7 +141,7 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
 
         // Passive energy
         resourceComp(world, KEY_RES_ENERGY)?.let {
-            it.amount = it.amount + BASE_ENERGY_PER_TICK * bigDelta
+            it.amount = it.amount + BASE_ENERGY_PER_TICK * bigDelta * globalMultiplier
         }
 
         // Generator chain
@@ -157,13 +175,13 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
         if (costRes.amount < totalCost) return
         costRes.amount = costRes.amount - totalCost
         val prodRes = resourceComp(world, "res_${gen.productionType.name.lowercase()}") ?: return
-        prodRes.amount = prodRes.amount + gen.productionRate * delta
+        prodRes.amount = prodRes.amount + gen.productionRate * delta * globalMultiplier
     }
 
     private fun resourceComp(world: World, key: String) = world.get<ResourceComponent>(key)
 
     override fun onTap(world: World) {
-        val tapAmount = currentTapProduction(world)
+        val tapAmount = currentTapProduction(world) * globalMultiplier
         resourceComp(world, KEY_RES_MATTER)?.let { it.amount = it.amount + tapAmount }
     }
 
@@ -236,6 +254,8 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
 
     /** Called after restore() has patched all world state. Syncs instance flags from world. */
     override fun syncStateFromWorld(world: World) {
+        globalMultiplier = if (seedBonus != null)
+            BigDouble.of(seedBonus!!.globalMultiplier.toDouble()) else BigDouble.ONE
         val stars = world.get<ResourceComponent>(KEY_RES_STARS)?.amount ?: BigDouble.ZERO
         val planets = world.get<ResourceComponent>(KEY_RES_PLANETS)?.amount ?: BigDouble.ZERO
         firstStarFired = stars > BigDouble.ZERO
