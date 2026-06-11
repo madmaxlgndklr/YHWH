@@ -21,8 +21,9 @@ fun SettingsScreen(
     onNavigateToGame: () -> Unit
 ) {
     val authState by viewModel.authState.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showRestartDialog by remember { mutableStateOf(false) }
-    val bonus = remember { viewModel.computedSeedBonus() }
+    val bonus = remember(uiState) { viewModel.computedSeedBonus() }
 
     val bonusText = buildString {
         val pct = ((bonus.globalMultiplier - 1.0f) * 100).toInt()
