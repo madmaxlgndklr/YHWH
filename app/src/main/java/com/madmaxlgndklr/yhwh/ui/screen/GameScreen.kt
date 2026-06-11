@@ -53,10 +53,10 @@ fun GameScreen(
             )
             ActionPanel(
                 state = uiState,
-                viewModel = viewModel,
                 onTap = viewModel::onQuantumFluctuationTap,
                 onUpgradePurchase = viewModel::onUpgradePurchase,
                 onGeneratorPurchase = viewModel::onGeneratorPurchase,
+                onNavigateToSettings = onNavigateToSettings,
                 modifier = Modifier.fillMaxWidth()
             )
         }
