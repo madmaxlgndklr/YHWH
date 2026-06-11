@@ -38,21 +38,16 @@ class CosmologySystemSeedTest {
         assertEquals(50.0, matter.amount.toDouble(), 0.01)
     }
 
-    @Test fun `globalMultiplier doubles passive energy per tick`() {
-        val system1 = CosmologySystem()
-        system1.initialize(world)
-        system1.tick(world, 1L)
-        val energyWithoutMultiplier = world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!.amount.toDouble()
-        assertEquals("Base rate should be 5.0", 5.0, energyWithoutMultiplier, 0.01)
-
-        val world2 = World()
-        val system2 = CosmologySystem().apply {
-            seedBonus = SeedBonus(globalMultiplier = 2.0f)
+    @Test fun `globalMultiplier scales passive energy per tick`() {
+        // Use 1.5x — produces 7.5 energy, which stays below the Nebula's 10-energy cost
+        // so the Nebula generator doesn't fire and consume the energy mid-test.
+        val system = CosmologySystem().apply {
+            seedBonus = SeedBonus(globalMultiplier = 1.5f)
         }
-        system2.initialize(world2)
-        system2.tick(world2, 1L)
-        val energyWithMultiplier = world2.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!.amount.toDouble()
-        assertEquals("With 2x multiplier should be 10.0, got $energyWithMultiplier", 10.0, energyWithMultiplier, 0.01)
+        system.initialize(world)
+        system.tick(world, 1L)
+        val energy = world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!
+        assertEquals(7.5, energy.amount.toDouble(), 0.01)
     }
 
     @Test fun `globalMultiplier doubles tap production`() {
