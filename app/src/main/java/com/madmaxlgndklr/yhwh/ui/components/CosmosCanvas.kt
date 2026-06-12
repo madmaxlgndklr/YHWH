@@ -387,8 +387,10 @@ private fun DrawScope.drawIndustrialParticles(civLevel: Float, orbitalAngle: Flo
         val row = i / cols
         val jitterX = (rng.nextFloat() - 0.5f) * spacingX * 0.3f
         val jitterY = (rng.nextFloat() - 0.5f) * spacingY * 0.3f
-        val x = spacingX * (col + 1f) + jitterX
-        val y = spacingY * (row + 1f) + jitterY
+        val driftX = sin((orbitalAngle + col * 37f) * Math.PI.toFloat() / 180f) * 0.006f * size.width
+        val driftY = cos((orbitalAngle + row * 29f) * Math.PI.toFloat() / 180f) * 0.006f * size.height
+        val x = spacingX * (col + 1f) + jitterX + driftX
+        val y = spacingY * (row + 1f) + jitterY + driftY
         drawRect(
             color = Color(0xFFCC6600).copy(alpha = 0.25f + civLevel * 0.3f),
             topLeft = Offset(x - 3f, y - 5f),
@@ -415,7 +417,7 @@ private fun DrawScope.drawCivilizationBurst(burst: TapBurst, now: Long) {
         val px = burst.position.x + cos(angle) * distance
         val py = burst.position.y + sin(angle) * distance
         val alpha = (1f - progress).coerceIn(0f, 1f)
-        val headR = 2.5f * (1f - progress * 0.5f)
+        val headR = (2.5f * (1f - progress * 0.5f)).coerceAtLeast(0.5f)
         drawCircle(
             color = Color(0xFFFFCC66).copy(alpha = alpha),
             radius = headR,
