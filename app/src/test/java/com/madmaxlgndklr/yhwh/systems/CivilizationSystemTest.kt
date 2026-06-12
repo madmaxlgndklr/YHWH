@@ -98,7 +98,9 @@ class CivilizationSystemTest {
         val dominanceBefore = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_DOMINANCE)!!.amount
         system.tick(world, 1L)
         val dominanceAfter = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_DOMINANCE)!!.amount
+        val followersAfter = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_FOLLOWERS)!!.amount
         assertTrue("Dominance should be consumed by Early Settlements", dominanceAfter < dominanceBefore)
+        assertTrue("Followers should exceed passive baseline alone", followersAfter > BigDouble.ONE)
     }
 
     // --- Win condition ---
