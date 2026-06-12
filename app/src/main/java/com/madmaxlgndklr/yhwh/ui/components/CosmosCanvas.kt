@@ -93,6 +93,11 @@ fun CosmosCanvas(
         targetValue = when (state.epoch) {
             EpochType.BIOLOGY -> Color(0xFF001A1A)
             EpochType.EVOLUTION -> evolutionBgColor
+            EpochType.CIVILIZATION -> when (state.civEraLevel) {
+                2 -> Color(0xFF1A0B00)   // Industrial
+                1 -> Color(0xFF252018)   // Medieval
+                else -> Color(0xFF3D2800) // Ancient
+            }
             else -> if (state.planetsFormed) Color(0xFF001830) else Color(0xFF050510)
         },
         animationSpec = tween(durationMillis = 3000),
@@ -124,6 +129,14 @@ fun CosmosCanvas(
                     drawOrganismParticles(state.speciesLevel, orbitalAngle)
                     if (state.activeEvent != null) drawEventOverlay(state.activeEvent, glowPulse)
                 }
+                EpochType.CIVILIZATION -> {
+                    when (state.civEraLevel) {
+                        2 -> drawIndustrialParticles(state.civilizationLevel, orbitalAngle)
+                        1 -> drawMedievalParticles(state.civilizationLevel, orbitalAngle)
+                        else -> drawAncientParticles(state.civilizationLevel, orbitalAngle)
+                    }
+                    if (state.civilUnrestActive) drawCivilizationCrisisOverlay(glowPulse)
+                }
                 else -> {
                     if (state.matterLevel > 0f) drawMatterParticles(state.matterLevel)
                     if (state.starsFormed) drawStellarGlow(state.starLevel, glowPulse)
@@ -134,7 +147,10 @@ fun CosmosCanvas(
 
             @Suppress("UNUSED_EXPRESSION") burstTick
             val drawNow = System.currentTimeMillis()
-            bursts.forEach { burst -> drawBurst(burst, drawNow) }
+            bursts.forEach { burst ->
+                if (state.epoch == EpochType.CIVILIZATION) drawCivilizationBurst(burst, drawNow)
+                else drawBurst(burst, drawNow)
+            }
         }
     }
 }
@@ -319,5 +335,96 @@ private fun DrawScope.drawEventOverlay(event: EvolutionEvent, pulse: Float) {
                 color = Color(0xFF886644).copy(alpha = 0.15f + pulse * 0.05f),
                 size = size
             )
+    }
+}
+
+private fun DrawScope.drawAncientParticles(civLevel: Float, orbitalAngle: Float) {
+    val count = (civLevel * 30).toInt().coerceAtLeast(4)
+    val rng = Random(seed = 31L)
+    repeat(count) { i ->
+        val baseX = rng.nextFloat()
+        val baseY = rng.nextFloat()
+        val driftX = sin((orbitalAngle + i * 27f) * Math.PI.toFloat() / 180f) * 0.01f
+        val driftY = cos((orbitalAngle + i * 19f) * Math.PI.toFloat() / 180f) * 0.01f
+        val x = (baseX + driftX).coerceIn(0f, 1f) * size.width
+        val y = (baseY + driftY).coerceIn(0f, 1f) * size.height
+        drawCircle(
+            color = Color(0xFFFFAA44).copy(alpha = 0.3f + civLevel * 0.4f),
+            radius = rng.nextFloat() * 2.5f + 1f,
+            center = Offset(x, y)
+        )
+    }
+}
+
+private fun DrawScope.drawMedievalParticles(civLevel: Float, orbitalAngle: Float) {
+    val count = (civLevel * 20).toInt().coerceAtLeast(3)
+    val rng = Random(seed = 53L)
+    repeat(count) { i ->
+        val baseX = rng.nextFloat()
+        val baseY = rng.nextFloat()
+        val driftX = sin((orbitalAngle + i * 33f) * Math.PI.toFloat() / 180f) * 0.008f
+        val driftY = cos((orbitalAngle + i * 21f) * Math.PI.toFloat() / 180f) * 0.008f
+        val x = (baseX + driftX).coerceIn(0f, 1f) * size.width
+        val y = (baseY + driftY).coerceIn(0f, 1f) * size.height
+        val w = rng.nextFloat() * 6f + 3f
+        val h = w * (1.5f + rng.nextFloat())
+        drawRect(
+            color = Color(0xFF998877).copy(alpha = 0.35f + civLevel * 0.35f),
+            topLeft = Offset(x - w / 2f, y - h / 2f),
+            size = Size(w, h)
+        )
+    }
+}
+
+private fun DrawScope.drawIndustrialParticles(civLevel: Float, orbitalAngle: Float) {
+    val cols = (civLevel * 8).toInt().coerceAtLeast(2)
+    val rows = (civLevel * 6).toInt().coerceAtLeast(2)
+    val spacingX = size.width / (cols + 1f)
+    val spacingY = size.height / (rows + 1f)
+    val rng = Random(seed = 71L)
+    repeat(cols * rows) { i ->
+        val col = i % cols
+        val row = i / cols
+        val jitterX = (rng.nextFloat() - 0.5f) * spacingX * 0.3f
+        val jitterY = (rng.nextFloat() - 0.5f) * spacingY * 0.3f
+        val x = spacingX * (col + 1f) + jitterX
+        val y = spacingY * (row + 1f) + jitterY
+        drawRect(
+            color = Color(0xFFCC6600).copy(alpha = 0.25f + civLevel * 0.3f),
+            topLeft = Offset(x - 3f, y - 5f),
+            size = Size(6f, 10f)
+        )
+    }
+}
+
+private fun DrawScope.drawCivilizationCrisisOverlay(pulse: Float) {
+    drawRect(
+        color = Color(0xFFCC2200).copy(alpha = 0.10f + pulse * 0.08f),
+        size = size
+    )
+}
+
+private fun DrawScope.drawCivilizationBurst(burst: TapBurst, now: Long) {
+    val elapsed = (now - burst.startTime).coerceIn(0L, BURST_DURATION_MS)
+    val progress = elapsed / BURST_DURATION_MS.toFloat()
+    val rng = Random(burst.startTime.toInt())
+    repeat(BURST_PARTICLE_COUNT) { i ->
+        val angle = (i.toFloat() / BURST_PARTICLE_COUNT) * 2f * Math.PI.toFloat() +
+                rng.nextFloat() * 0.4f
+        val distance = BURST_MAX_RADIUS * progress
+        val px = burst.position.x + cos(angle) * distance
+        val py = burst.position.y + sin(angle) * distance
+        val alpha = (1f - progress).coerceIn(0f, 1f)
+        val headR = 2.5f * (1f - progress * 0.5f)
+        drawCircle(
+            color = Color(0xFFFFCC66).copy(alpha = alpha),
+            radius = headR,
+            center = Offset(px, py - headR * 1.5f)
+        )
+        drawRect(
+            color = Color(0xFFFFAA44).copy(alpha = alpha * 0.8f),
+            topLeft = Offset(px - headR * 0.6f, py - headR * 0.5f),
+            size = Size(headR * 1.2f, headR * 2f)
+        )
     }
 }
