@@ -92,6 +92,15 @@ class CivilizationSystemTest {
         assertTrue(world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount > BigDouble.ZERO)
     }
 
+    @Test fun `early settlements produces followers by consuming dominance`() {
+        world.put(EvolutionSystem.KEY_RES_DOMINANCE,
+            ResourceComponent(ResourceType.DOMINANCE, BigDouble.of(100.0)))
+        val dominanceBefore = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_DOMINANCE)!!.amount
+        system.tick(world, 1L)
+        val dominanceAfter = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_DOMINANCE)!!.amount
+        assertTrue("Dominance should be consumed by Early Settlements", dominanceAfter < dominanceBefore)
+    }
+
     // --- Win condition ---
 
     @Test fun `epoch progress is 1_0 at 1000 civilization`() {

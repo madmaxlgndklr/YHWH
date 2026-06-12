@@ -276,8 +276,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
                 val availableResource = resources[upg.costType.name] ?: BigDouble.ZERO
                 val available = when {
                     key == KEY_UPG_INDUSTRIAL_ERA && !medievalPurchased -> false
-                    upg.repeatable -> availableResource >= upg.costAmount
-                    upg.purchased -> false
+                    upg.purchased && !upg.repeatable -> false
                     else -> availableResource >= upg.costAmount
                 }
                 UpgradeSnapshot(
