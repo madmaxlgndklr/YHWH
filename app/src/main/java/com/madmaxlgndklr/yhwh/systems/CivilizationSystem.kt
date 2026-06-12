@@ -47,6 +47,8 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
     private var unrestLevel: Float = 0f
     private var civilUnrestActive: Boolean = false
     private var civilUnrestTicks: Int = 0
+    private var eraLevel: Int = 0
+    private var eraMultiplier: BigDouble = BigDouble.ONE
 
     override fun initialize(world: World) {
         // Seeding: read Dominance from previous epoch
@@ -141,9 +143,13 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         val bigDelta = BigDouble.of(delta.toDouble())
         val intDelta = delta.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
-        // Unrest accumulation (era-aware rate added in Task 4; here: Ancient only)
+        // Unrest accumulation (era-aware rate)
         val socialOrderPurchased = world.get<UpgradeComponent>(KEY_UPG_SOCIAL_ORDER)?.purchased == true
-        val unrestRate = if (socialOrderPurchased) 0.25f else 0.5f
+        val unrestRate = when (eraLevel) {
+            2 -> if (socialOrderPurchased) 0.5f else 1.0f
+            1 -> if (socialOrderPurchased) 0.375f else 0.75f
+            else -> if (socialOrderPurchased) 0.25f else 0.5f
+        }
         unrestLevel = (unrestLevel + unrestRate * intDelta).coerceAtMost(MAX_UNREST)
 
         // Crisis trigger
@@ -193,7 +199,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         if (costRes.amount < totalCost) return
         costRes.amount = costRes.amount - totalCost
         val prodRes = resourceComp(world, "res_${gen.productionType.name.lowercase()}") ?: return
-        prodRes.amount = prodRes.amount + gen.productionRate * delta * productionMultiplier
+        prodRes.amount = prodRes.amount + gen.productionRate * delta * eraMultiplier * productionMultiplier
     }
 
     override fun onTap(world: World) {
@@ -211,7 +217,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
     }
 
     override fun purchaseUpgrade(world: World, upgradeId: String) {
-        // Public Works: repeatable, reduces unrest directly
+        // Public Works: repeatable unrest reduction
         if (upgradeId == KEY_UPG_PUBLIC_WORKS) {
             val cultRes = resourceComp(world, KEY_RES_CULTURE) ?: return
             if (cultRes.amount < PUBLIC_WORKS_COST) return
@@ -219,7 +225,31 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
             unrestLevel = (unrestLevel - PUBLIC_WORKS_REDUCTION).coerceAtLeast(0f)
             return
         }
-        // Normal one-time upgrades (era specials handled in Task 4)
+        // Medieval era advancement
+        if (upgradeId == KEY_UPG_MEDIEVAL_ERA) {
+            if (eraLevel >= 1) return
+            val civRes = resourceComp(world, KEY_RES_CIVILIZATION) ?: return
+            if (civRes.amount < BigDouble.of(50.0)) return
+            civRes.amount = civRes.amount - BigDouble.of(50.0)
+            eraLevel = 1
+            eraMultiplier = BigDouble.of(2.0)
+            world.get<GeneratorComponent>(KEY_GEN_CULTURAL_EXCHANGE)?.unlocked = true
+            world.get<UpgradeComponent>(KEY_UPG_MEDIEVAL_ERA)?.purchased = true
+            return
+        }
+        // Industrial era advancement
+        if (upgradeId == KEY_UPG_INDUSTRIAL_ERA) {
+            if (eraLevel < 1 || eraLevel >= 2) return
+            val civRes = resourceComp(world, KEY_RES_CIVILIZATION) ?: return
+            if (civRes.amount < BigDouble.of(200.0)) return
+            civRes.amount = civRes.amount - BigDouble.of(200.0)
+            eraLevel = 2
+            eraMultiplier = BigDouble.of(4.0)
+            world.get<GeneratorComponent>(KEY_GEN_ENLIGHTENED_SENATE)?.unlocked = true
+            world.get<UpgradeComponent>(KEY_UPG_INDUSTRIAL_ERA)?.purchased = true
+            return
+        }
+        // Normal one-time upgrades
         val upg = world.get<UpgradeComponent>(upgradeId) ?: return
         if (upg.purchased && !upg.repeatable) return
         val costRes = resourceComp(world, "res_${upg.costType.name.lowercase()}") ?: return
@@ -259,9 +289,21 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
     private fun resourceComp(world: World, key: String) = world.get<ResourceComponent>(key)
 
     override fun syncStateFromWorld(world: World) {
-        val civilization = resourceComp(world, KEY_RES_CIVILIZATION)?.amount ?: BigDouble.ZERO
-        firstCivilizationFired = civilization > BigDouble.ZERO
-        // No era state yet — added in Task 4
+        val medievalPurchased = world.get<UpgradeComponent>(KEY_UPG_MEDIEVAL_ERA)?.purchased == true
+        val industrialPurchased = world.get<UpgradeComponent>(KEY_UPG_INDUSTRIAL_ERA)?.purchased == true
+        eraLevel = when {
+            industrialPurchased -> 2
+            medievalPurchased -> 1
+            else -> 0
+        }
+        eraMultiplier = when (eraLevel) {
+            2 -> BigDouble.of(4.0)
+            1 -> BigDouble.of(2.0)
+            else -> BigDouble.ONE
+        }
+        val civ = resourceComp(world, KEY_RES_CIVILIZATION)?.amount ?: BigDouble.ZERO
+        firstCivilizationFired = civ > BigDouble.ZERO
+        // unrestLevel and civilUnrestActive reset to 0/false on restore (same as Evolution event reset)
     }
 
     override fun toSnapshot(world: World, tick: Long): GameSnapshot {

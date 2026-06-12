@@ -168,4 +168,77 @@ class CivilizationSystemTest {
         val unrestAfter = system.toSnapshot(world, 0L).unrestLevel
         assertEquals(25f, unrestBefore - unrestAfter, 2f)
     }
+
+    // --- Era advancement ---
+
+    @Test fun `medieval era advance doubles all generator production`() {
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(50.0)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.of(100.0)
+        val knowledgeBefore = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount
+        system.tick(world, 1L)
+        val gained = (world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount - knowledgeBefore).toDouble()
+        assertEquals(2.0, gained, 0.1)
+    }
+
+    @Test fun `medieval era advance unlocks cultural exchange generator`() {
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(50.0)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)
+        assertTrue(world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_CULTURAL_EXCHANGE)!!.unlocked)
+    }
+
+    @Test fun `industrial era is blocked until medieval`() {
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(200.0)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA)
+        assertFalse(world.get<UpgradeComponent>(CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA)!!.purchased)
+    }
+
+    @Test fun `industrial era advance gives 4x total production`() {
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(250.0)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA)
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.of(100.0)
+        val before = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount
+        system.tick(world, 1L)
+        val gained = (world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount - before).toDouble()
+        assertEquals(4.0, gained, 0.1)
+    }
+
+    @Test fun `industrial era advance unlocks enlightened senate`() {
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(250.0)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA)
+        assertTrue(world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_ENLIGHTENED_SENATE)!!.unlocked)
+    }
+
+    @Test fun `era restored to medieval in syncStateFromWorld`() {
+        world.get<UpgradeComponent>(CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)!!.purchased = true
+        system.syncStateFromWorld(world)
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.of(100.0)
+        val before = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount
+        system.tick(world, 1L)
+        val gained = (world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount - before).toDouble()
+        assertEquals(2.0, gained, 0.1)
+    }
+
+    @Test fun `industrial upgrade shows unavailable in snapshot when medieval not purchased`() {
+        val snap = system.toSnapshot(world, 0L)
+        val industrialSnap = snap.upgrades.find { it.id == CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA }!!
+        assertFalse(industrialSnap.available)
+    }
+
+    @Test fun `unrest rate increases in medieval era`() {
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(50.0)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)
+        system.tick(world, 1L)
+        assertEquals(0.75f, system.toSnapshot(world, 0L).unrestLevel, 0.1f)
+    }
+
+    @Test fun `unrest rate increases in industrial era`() {
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(250.0)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA)
+        system.tick(world, 1L)
+        assertEquals(1.0f, system.toSnapshot(world, 0L).unrestLevel, 0.1f)
+    }
 }
