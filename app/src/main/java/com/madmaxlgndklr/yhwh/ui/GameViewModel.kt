@@ -22,6 +22,7 @@ import com.madmaxlgndklr.yhwh.persistence.SaveData
 import com.madmaxlgndklr.yhwh.persistence.SaveManager
 import com.madmaxlgndklr.yhwh.systems.BiologySystem
 import com.madmaxlgndklr.yhwh.systems.CosmologySystem
+import com.madmaxlgndklr.yhwh.systems.CivilizationSystem
 import com.madmaxlgndklr.yhwh.systems.EvolutionSystem
 import com.madmaxlgndklr.yhwh.ui.state.CosmosState
 import com.madmaxlgndklr.yhwh.ui.state.GameUiState
@@ -106,6 +107,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     transitionMessage = if (showTransition) when (snapshot.epoch) {
                         EpochType.COSMOLOGY -> "A world has formed. Life stirs in the primordial ocean."
                         EpochType.BIOLOGY -> "Organisms compete for survival. Evolution begins."
+                        EpochType.EVOLUTION -> "Survivors of a million years rise from the wilderness. Civilization begins."
                         else -> "The next age dawns."
                     } else _uiState.value.transitionMessage,
                     offlineEarningsSummary = _uiState.value.offlineEarningsSummary,
@@ -119,6 +121,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val system: GameSystem = when (saved?.snapshot?.epoch) {
             EpochType.BIOLOGY -> BiologySystem()
             EpochType.EVOLUTION -> EvolutionSystem()
+            EpochType.CIVILIZATION -> CivilizationSystem()
             else -> CosmologySystem().also { it.seedBonus = meta.seedBonus }
         }
         engine.registerSystem(system)
@@ -256,6 +259,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         when (engine.snapshot.value?.epoch) {
             EpochType.COSMOLOGY -> engine.advanceEpoch(BiologySystem())
             EpochType.BIOLOGY -> engine.advanceEpoch(EvolutionSystem())
+            EpochType.EVOLUTION -> engine.advanceEpoch(CivilizationSystem())
             else -> { /* future epochs */ }
         }
     }
@@ -352,7 +356,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             activeEvent = activeEvent,
             eventTicksRemaining = eventTicksRemaining,
             restartCount = meta.restartCount,
-            activeSeedMultiplier = meta.seedBonus.globalMultiplier
+            activeSeedMultiplier = meta.seedBonus.globalMultiplier,
+            unrestLevel = if (epoch == EpochType.CIVILIZATION) unrestLevel else 0f,
+            civilizationEraName = if (epoch == EpochType.CIVILIZATION) {
+                val medievalPurchased = upgrades.find { it.id == CivilizationSystem.KEY_UPG_MEDIEVAL_ERA }?.purchased == true
+                val industrialPurchased = upgrades.find { it.id == CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA }?.purchased == true
+                when {
+                    industrialPurchased -> "Industrial Era"
+                    medievalPurchased -> "Medieval Era"
+                    else -> "Ancient Era"
+                }
+            } else "",
         )
     }
 
@@ -379,6 +393,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     speciesLevel = (species.toDouble() / EvolutionSystem.SPECIES_VISUAL_THRESHOLD)
                         .toFloat().coerceIn(0f, 1f),
                     activeEvent = activeEvent
+                )
+            }
+            EpochType.CIVILIZATION -> {
+                val knowledge = resources[ResourceType.KNOWLEDGE.name] ?: BigDouble.ZERO
+                val medievalPurchased = upgrades.find { it.id == CivilizationSystem.KEY_UPG_MEDIEVAL_ERA }?.purchased == true
+                val industrialPurchased = upgrades.find { it.id == CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA }?.purchased == true
+                val eraLevel = when {
+                    industrialPurchased -> 2
+                    medievalPurchased -> 1
+                    else -> 0
+                }
+                CosmosState(
+                    epoch = epoch,
+                    civEraLevel = eraLevel,
+                    civilizationLevel = (knowledge.toDouble() / CivilizationSystem.KNOWLEDGE_VISUAL_THRESHOLD)
+                        .toFloat().coerceIn(0f, 1f),
+                    civilUnrestActive = civilUnrestActive
                 )
             }
             else -> {
