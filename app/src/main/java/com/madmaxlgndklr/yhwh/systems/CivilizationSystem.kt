@@ -8,9 +8,6 @@ import kotlin.math.pow
 /**
  * Implements all Civilization epoch game logic.
  * Implements [GameSystem] (tick loop + snapshot) and [PlayerActionHandler] (player actions).
- *
- * NOTE: Unrest mechanic and era advancement are NOT present in this base structure;
- * they are added in Tasks 3 and 4 respectively.
  */
 class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
 
@@ -71,7 +68,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
             costAmount = BigDouble.ONE,
             unlocked = true
         ))
-        // Cultural Exchange starts locked; requires Social Order upgrade to unlock
+        // Cultural Exchange starts locked; unlocked when Medieval Era is purchased
         world.put(KEY_GEN_CULTURAL_EXCHANGE, GeneratorComponent(
             id = KEY_GEN_CULTURAL_EXCHANGE,
             productionType = ResourceType.CULTURE,
@@ -228,9 +225,10 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         // Medieval era advancement
         if (upgradeId == KEY_UPG_MEDIEVAL_ERA) {
             if (eraLevel >= 1) return
+            val upg = world.get<UpgradeComponent>(KEY_UPG_MEDIEVAL_ERA) ?: return
             val civRes = resourceComp(world, KEY_RES_CIVILIZATION) ?: return
-            if (civRes.amount < BigDouble.of(50.0)) return
-            civRes.amount = civRes.amount - BigDouble.of(50.0)
+            if (civRes.amount < upg.costAmount) return
+            civRes.amount = civRes.amount - upg.costAmount
             eraLevel = 1
             eraMultiplier = BigDouble.of(2.0)
             world.get<GeneratorComponent>(KEY_GEN_CULTURAL_EXCHANGE)?.unlocked = true
@@ -240,9 +238,10 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         // Industrial era advancement
         if (upgradeId == KEY_UPG_INDUSTRIAL_ERA) {
             if (eraLevel < 1 || eraLevel >= 2) return
+            val upg = world.get<UpgradeComponent>(KEY_UPG_INDUSTRIAL_ERA) ?: return
             val civRes = resourceComp(world, KEY_RES_CIVILIZATION) ?: return
-            if (civRes.amount < BigDouble.of(200.0)) return
-            civRes.amount = civRes.amount - BigDouble.of(200.0)
+            if (civRes.amount < upg.costAmount) return
+            civRes.amount = civRes.amount - upg.costAmount
             eraLevel = 2
             eraMultiplier = BigDouble.of(4.0)
             world.get<GeneratorComponent>(KEY_GEN_ENLIGHTENED_SENATE)?.unlocked = true

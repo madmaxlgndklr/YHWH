@@ -241,4 +241,25 @@ class CivilizationSystemTest {
         system.tick(world, 1L)
         assertEquals(1.0f, system.toSnapshot(world, 0L).unrestLevel, 0.1f)
     }
+
+    @Test fun `era multiplier and crisis multiplier compose on cultural exchange`() {
+        // Set up Industrial era (4x) and trigger a crisis
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(250.0)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA)
+        // Unlock Cultural Exchange and prime Followers
+        world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_CULTURAL_EXCHANGE)!!.unlocked = true
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_FOLLOWERS)!!.amount = BigDouble.of(10000.0)
+        // Trigger a crisis: industrial rate is 1.0/tick, needs 100 ticks
+        repeat(100) { system.tick(world, 1L) }
+        assertTrue("crisis should be active", system.toSnapshot(world, 0L).civilUnrestActive)
+        // Zero out culture so Scholars Guild (cost=10) cannot drain the measurement tick
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.ZERO
+        // During crisis: Cultural Exchange should produce at 4.0 * 0.5 = 2.0 per tick
+        val cultureBefore = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount
+        system.tick(world, 1L)
+        val cultureAfter = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount
+        val gained = (cultureAfter - cultureBefore).toDouble()
+        assertEquals(2.0, gained, 0.2)
+    }
 }
