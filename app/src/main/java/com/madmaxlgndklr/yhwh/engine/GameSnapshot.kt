@@ -43,5 +43,7 @@ data class GameSnapshot(
     /** Cumulative total ever produced for each resource, across all epochs. Persisted with save. */
     val lifetimeTotals: Map<String, BigDouble> = emptyMap(),
     val activeEvent: EvolutionEvent? = null,
-    val eventTicksRemaining: Int = 0
+    val eventTicksRemaining: Int = 0,
+    val unrestLevel: Float = 0f,
+    val civilUnrestActive: Boolean = false,
 )

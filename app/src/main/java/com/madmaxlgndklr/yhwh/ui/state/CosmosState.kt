@@ -13,5 +13,8 @@ data class CosmosState(
     val cellLevel: Float = 0f,
     val mutationLevel: Float = 0f,
     val speciesLevel: Float = 0f,
-    val activeEvent: EvolutionEvent? = null
+    val activeEvent: EvolutionEvent? = null,
+    val civEraLevel: Int = 0,
+    val civilizationLevel: Float = 0f,
+    val civilUnrestActive: Boolean = false,
 )

@@ -27,5 +27,7 @@ data class GameUiState(
     val activeEvent: EvolutionEvent? = null,
     val eventTicksRemaining: Int = 0,
     val restartCount: Int = 0,
-    val activeSeedMultiplier: Float = 1.0f
+    val activeSeedMultiplier: Float = 1.0f,
+    val unrestLevel: Float = 0f,
+    val civilizationEraName: String = "",
 )

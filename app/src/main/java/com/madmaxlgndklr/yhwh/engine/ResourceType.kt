@@ -17,5 +17,9 @@ enum class ResourceType(val displayName: String, val symbol: String) {
     GENES("Genes", "🧬"),
     MUTATIONS("Mutations", "🔀"),
     SPECIES("Species", "🦎"),
-    DOMINANCE("Dominance", "👑")
+    DOMINANCE("Dominance", "👑"),
+    FOLLOWERS("Followers", "🧑"),
+    CULTURE("Culture", "🎭"),
+    KNOWLEDGE("Knowledge", "📚"),
+    CIVILIZATION("Civilization", "🏛️"),
 }
