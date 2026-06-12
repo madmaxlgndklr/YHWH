@@ -339,7 +339,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
 
         val upgMeta = mapOf(
             KEY_UPG_DIVINE_CALLING to Pair("Divine Calling", "×2 Followers per tap"),
-            KEY_UPG_SOCIAL_ORDER to Pair("Social Order", "Unlock Cultural Exchange"),
+            KEY_UPG_SOCIAL_ORDER to Pair("Social Order", "½ Unrest accumulation rate"),
             KEY_UPG_PUBLIC_WORKS to Pair("Public Works", "-${PUBLIC_WORKS_REDUCTION.toInt()} Unrest"),
             KEY_UPG_CULTURAL_RENAISSANCE to Pair("Cultural Renaissance", "×2 Cultural Exchange production"),
             KEY_UPG_MEDIEVAL_ERA to Pair("Medieval Era", "Advance to Medieval Era"),
