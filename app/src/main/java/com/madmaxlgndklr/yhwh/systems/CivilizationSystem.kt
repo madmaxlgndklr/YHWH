@@ -112,7 +112,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         // Public Works: repeatable sentinel (reduces unrest in Task 3)
         world.put(KEY_UPG_PUBLIC_WORKS, UpgradeComponent(
             id = KEY_UPG_PUBLIC_WORKS, purchased = false,
-            costType = ResourceType.CULTURE, costAmount = BigDouble.of(50.0),
+            costType = ResourceType.CULTURE, costAmount = PUBLIC_WORKS_COST,
             effect = UpgradeEffect.MultiplyTapProduction(BigDouble.ONE),
             repeatable = true
         ))
@@ -149,7 +149,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         // Crisis trigger
         if (unrestLevel >= MAX_UNREST && !civilUnrestActive) {
             civilUnrestActive = true
-            civilUnrestTicks = CRISIS_DURATION
+            civilUnrestTicks = CRISIS_DURATION + 1
             unrestLevel = 0f
             events.add(GameEvent(0, "Civil unrest erupts across the lands!", isMilestone = true))
         }
@@ -227,7 +227,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         costRes.amount = costRes.amount - upg.costAmount
         if (!upg.repeatable) {
             upg.purchased = true
-            applyUpgradeEffect(world, upg.effect)
+            applyUpgradeEffect(world, upg.effect) // repeatable effects applied in their own handlers above
         }
     }
 
@@ -299,7 +299,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         val upgMeta = mapOf(
             KEY_UPG_DIVINE_CALLING to Pair("Divine Calling", "×2 Followers per tap"),
             KEY_UPG_SOCIAL_ORDER to Pair("Social Order", "Unlock Cultural Exchange"),
-            KEY_UPG_PUBLIC_WORKS to Pair("Public Works", "-${PUBLIC_WORKS_REDUCTION.toInt()}% unrest"),
+            KEY_UPG_PUBLIC_WORKS to Pair("Public Works", "-${PUBLIC_WORKS_REDUCTION.toInt()} Unrest"),
             KEY_UPG_CULTURAL_RENAISSANCE to Pair("Cultural Renaissance", "×2 Cultural Exchange production"),
             KEY_UPG_MEDIEVAL_ERA to Pair("Medieval Era", "Advance to Medieval Era"),
             KEY_UPG_INDUSTRIAL_ERA to Pair("Industrial Era", "Advance to Industrial Era")
