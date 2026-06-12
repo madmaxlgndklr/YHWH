@@ -359,11 +359,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             activeSeedMultiplier = meta.seedBonus.globalMultiplier,
             unrestLevel = if (epoch == EpochType.CIVILIZATION) unrestLevel else 0f,
             civilizationEraName = if (epoch == EpochType.CIVILIZATION) {
-                val medievalPurchased = upgrades.find { it.id == CivilizationSystem.KEY_UPG_MEDIEVAL_ERA }?.purchased == true
-                val industrialPurchased = upgrades.find { it.id == CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA }?.purchased == true
-                when {
-                    industrialPurchased -> "Industrial Era"
-                    medievalPurchased -> "Medieval Era"
+                when (civEraLevel()) {
+                    2 -> "Industrial Era"
+                    1 -> "Medieval Era"
                     else -> "Ancient Era"
                 }
             } else "",
@@ -397,16 +395,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
             EpochType.CIVILIZATION -> {
                 val knowledge = resources[ResourceType.KNOWLEDGE.name] ?: BigDouble.ZERO
-                val medievalPurchased = upgrades.find { it.id == CivilizationSystem.KEY_UPG_MEDIEVAL_ERA }?.purchased == true
-                val industrialPurchased = upgrades.find { it.id == CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA }?.purchased == true
-                val eraLevel = when {
-                    industrialPurchased -> 2
-                    medievalPurchased -> 1
-                    else -> 0
-                }
                 CosmosState(
                     epoch = epoch,
-                    civEraLevel = eraLevel,
+                    civEraLevel = civEraLevel(),
                     civilizationLevel = (knowledge.toDouble() / CivilizationSystem.KNOWLEDGE_VISUAL_THRESHOLD)
                         .toFloat().coerceIn(0f, 1f),
                     civilUnrestActive = civilUnrestActive
@@ -450,5 +441,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         ticks < 60 -> "${ticks}s"
         ticks < 3600 -> "${ticks / 60}m"
         else -> "${ticks / 3600}h ${(ticks % 3600) / 60}m"
+    }
+
+    private fun GameSnapshot.civEraLevel(): Int {
+        val medievalPurchased = upgrades.find { it.id == CivilizationSystem.KEY_UPG_MEDIEVAL_ERA }?.purchased == true
+        val industrialPurchased = upgrades.find { it.id == CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA }?.purchased == true
+        return when {
+            industrialPurchased -> 2
+            medievalPurchased -> 1
+            else -> 0
+        }
     }
 }
