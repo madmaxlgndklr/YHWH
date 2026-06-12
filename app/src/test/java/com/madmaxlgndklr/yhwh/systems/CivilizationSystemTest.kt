@@ -114,4 +114,58 @@ class CivilizationSystemTest {
         world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(500.0)
         assertEquals(0.5f, system.toSnapshot(world, 0L).epochProgress, 0.001f)
     }
+
+    // --- Unrest ---
+
+    @Test fun `unrest accumulates at 0_5 per tick in ancient era`() {
+        system.tick(world, 1L)
+        assertEquals(0.5f, system.toSnapshot(world, 0L).unrestLevel, 0.1f)
+    }
+
+    @Test fun `social order halves unrest accumulation`() {
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.of(30.0)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_SOCIAL_ORDER)
+        system.tick(world, 1L)
+        assertEquals(0.25f, system.toSnapshot(world, 0L).unrestLevel, 0.05f)
+    }
+
+    @Test fun `unrest triggers civil crisis at 100`() {
+        repeat(200) { system.tick(world, 1L) }
+        val snap = system.toSnapshot(world, 0L)
+        assertTrue(snap.civilUnrestActive)
+    }
+
+    @Test fun `crisis resets unrest to zero`() {
+        repeat(200) { system.tick(world, 1L) }
+        val snap = system.toSnapshot(world, 0L)
+        assertEquals(0.0f, snap.unrestLevel, 0.01f)
+    }
+
+    @Test fun `crisis halves cultural exchange production`() {
+        world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_CULTURAL_EXCHANGE)!!.unlocked = true
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_FOLLOWERS)!!.amount = BigDouble.of(1000.0)
+        repeat(200) { system.tick(world, 1L) }
+        assertTrue(system.toSnapshot(world, 0L).civilUnrestActive)
+        val cultureBefore = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount
+        system.tick(world, 1L)
+        val cultureAfter = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount
+        val gain = (cultureAfter - cultureBefore).toDouble()
+        assertTrue("Expected gain ~0.5 but got $gain", gain < 0.9)
+    }
+
+    @Test fun `crisis ends after 30 ticks`() {
+        repeat(200) { system.tick(world, 1L) }
+        assertTrue(system.toSnapshot(world, 0L).civilUnrestActive)
+        repeat(30) { system.tick(world, 1L) }
+        assertFalse(system.toSnapshot(world, 0L).civilUnrestActive)
+    }
+
+    @Test fun `public works reduces unrest by 25`() {
+        repeat(100) { system.tick(world, 1L) }
+        val unrestBefore = system.toSnapshot(world, 0L).unrestLevel
+        world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.of(50.0)
+        system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_PUBLIC_WORKS)
+        val unrestAfter = system.toSnapshot(world, 0L).unrestLevel
+        assertEquals(25f, unrestBefore - unrestAfter, 2f)
+    }
 }

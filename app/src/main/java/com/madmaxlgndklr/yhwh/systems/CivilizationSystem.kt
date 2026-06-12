@@ -44,6 +44,9 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
     }
 
     private var firstCivilizationFired: Boolean = false
+    private var unrestLevel: Float = 0f
+    private var civilUnrestActive: Boolean = false
+    private var civilUnrestTicks: Int = 0
 
     override fun initialize(world: World) {
         // Seeding: read Dominance from previous epoch
@@ -136,26 +139,46 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
     override fun tick(world: World, delta: Long): List<GameEvent> {
         val events = mutableListOf<GameEvent>()
         val bigDelta = BigDouble.of(delta.toDouble())
+        val intDelta = delta.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
-        // Passive Followers baseline
+        // Unrest accumulation (era-aware rate added in Task 4; here: Ancient only)
+        val socialOrderPurchased = world.get<UpgradeComponent>(KEY_UPG_SOCIAL_ORDER)?.purchased == true
+        val unrestRate = if (socialOrderPurchased) 0.25f else 0.5f
+        unrestLevel = (unrestLevel + unrestRate * intDelta).coerceAtMost(MAX_UNREST)
+
+        // Crisis trigger
+        if (unrestLevel >= MAX_UNREST && !civilUnrestActive) {
+            civilUnrestActive = true
+            civilUnrestTicks = CRISIS_DURATION
+            unrestLevel = 0f
+            events.add(GameEvent(0, "Civil unrest erupts across the lands!", isMilestone = true))
+        }
+
+        // Crisis countdown
+        if (civilUnrestActive) {
+            civilUnrestTicks = (civilUnrestTicks - intDelta).coerceAtLeast(0)
+            if (civilUnrestTicks == 0) {
+                civilUnrestActive = false
+                events.add(GameEvent(0, "Order restored.", isMilestone = false))
+            }
+        }
+
         resourceComp(world, KEY_RES_FOLLOWERS)?.let {
             it.amount = it.amount + BASE_FOLLOWERS_PER_TICK * bigDelta
         }
 
-        // Generator chain
+        val crisisMultiplier = if (civilUnrestActive) BigDouble.of(0.5) else BigDouble.ONE
         runGenerator(world, KEY_GEN_EARLY_SETTLEMENTS, bigDelta)
-        runGenerator(world, KEY_GEN_CULTURAL_EXCHANGE, bigDelta)
+        runGenerator(world, KEY_GEN_CULTURAL_EXCHANGE, bigDelta, crisisMultiplier)
         runGenerator(world, KEY_GEN_SCHOLARS_GUILD, bigDelta)
         runGenerator(world, KEY_GEN_ENLIGHTENED_SENATE, bigDelta)
 
-        // Civilization milestone
         resourceComp(world, KEY_RES_CIVILIZATION)?.let { civ ->
             if (!firstCivilizationFired && civ.amount > BigDouble.ZERO) {
                 firstCivilizationFired = true
-                events.add(GameEvent(0, "A civilization rises from the ashes of evolution.", isMilestone = true))
+                events.add(GameEvent(0, "The first great civilization rises.", true))
             }
         }
-
         return events
     }
 
@@ -188,14 +211,24 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
     }
 
     override fun purchaseUpgrade(world: World, upgradeId: String) {
+        // Public Works: repeatable, reduces unrest directly
+        if (upgradeId == KEY_UPG_PUBLIC_WORKS) {
+            val cultRes = resourceComp(world, KEY_RES_CULTURE) ?: return
+            if (cultRes.amount < PUBLIC_WORKS_COST) return
+            cultRes.amount = cultRes.amount - PUBLIC_WORKS_COST
+            unrestLevel = (unrestLevel - PUBLIC_WORKS_REDUCTION).coerceAtLeast(0f)
+            return
+        }
+        // Normal one-time upgrades (era specials handled in Task 4)
         val upg = world.get<UpgradeComponent>(upgradeId) ?: return
-        // Normal one-time (or repeatable) purchase flow — no special cases in Task 2
         if (upg.purchased && !upg.repeatable) return
         val costRes = resourceComp(world, "res_${upg.costType.name.lowercase()}") ?: return
         if (costRes.amount < upg.costAmount) return
         costRes.amount = costRes.amount - upg.costAmount
-        if (!upg.repeatable) upg.purchased = true
-        applyUpgradeEffect(world, upg.effect)
+        if (!upg.repeatable) {
+            upg.purchased = true
+            applyUpgradeEffect(world, upg.effect)
+        }
     }
 
     private fun applyUpgradeEffect(world: World, effect: UpgradeEffect) {
@@ -295,14 +328,10 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         val epochProgress = (civilization.toDouble() / WIN_THRESHOLD).toFloat().coerceIn(0f, 1f)
 
         return GameSnapshot(
-            tick = tick,
-            epoch = EpochType.CIVILIZATION,
-            resources = resources,
-            generators = generators,
-            upgrades = upgrades,
-            epochProgress = epochProgress,
-            events = emptyList()
-            // unrestLevel and civilUnrestActive use defaults (0f, false) — added in Task 3
+            tick = tick, epoch = EpochType.CIVILIZATION,
+            resources = resources, generators = generators, upgrades = upgrades,
+            epochProgress = epochProgress, events = emptyList(),
+            unrestLevel = unrestLevel, civilUnrestActive = civilUnrestActive
         )
     }
 }
