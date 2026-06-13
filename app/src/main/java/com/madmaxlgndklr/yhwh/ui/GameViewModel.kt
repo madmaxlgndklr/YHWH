@@ -259,14 +259,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissEpochTransition() {
         epochTransitionAcknowledged = true
         _uiState.value = _uiState.value.copy(showEpochTransition = false)
-        when (engine.snapshot.value?.epoch) {
-            EpochType.COSMOLOGY -> engine.advanceEpoch(BiologySystem())
-            EpochType.BIOLOGY -> engine.advanceEpoch(EvolutionSystem())
-            EpochType.EVOLUTION -> engine.advanceEpoch(CivilizationSystem())
-            EpochType.CIVILIZATION -> engine.advanceEpoch(InterstellarSystem())
-            else -> { /* INTERSTELLAR is the final epoch — no advance */ }
+        val advanced = when (engine.snapshot.value?.epoch) {
+            EpochType.COSMOLOGY    -> { engine.advanceEpoch(BiologySystem());      true }
+            EpochType.BIOLOGY      -> { engine.advanceEpoch(EvolutionSystem());    true }
+            EpochType.EVOLUTION    -> { engine.advanceEpoch(CivilizationSystem()); true }
+            EpochType.CIVILIZATION -> { engine.advanceEpoch(InterstellarSystem()); true }
+            else -> false // INTERSTELLAR is the final epoch — keep acknowledged to suppress re-trigger
         }
-        epochTransitionAcknowledged = false
+        if (advanced) epochTransitionAcknowledged = false
     }
 
     fun dismissOfflineSummary() {
