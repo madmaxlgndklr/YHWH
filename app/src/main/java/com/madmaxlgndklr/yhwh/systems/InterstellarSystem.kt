@@ -190,6 +190,43 @@ class InterstellarSystem : GameSystem, PlayerActionHandler, Restorable {
     }
 
     override fun purchaseUpgrade(world: World, upgradeId: String) {
+        // Emergency Repairs: repeatable — spend 50 RESEARCH, restore 25 VESSELS
+        if (upgradeId == KEY_UPG_EMERGENCY_REPAIRS) {
+            val researchRes = resourceComp(world, KEY_RES_RESEARCH) ?: return
+            if (researchRes.amount < EMERGENCY_REPAIRS_COST) return
+            researchRes.amount = researchRes.amount - EMERGENCY_REPAIRS_COST
+            resourceComp(world, KEY_RES_VESSELS)?.let { it.amount = it.amount + EMERGENCY_REPAIRS_AMOUNT }
+            return
+        }
+        // Ion Drive: advance to Phase 1
+        if (upgradeId == KEY_UPG_ION_DRIVE) {
+            if (drivePhase >= 1) return
+            val upg = world.get<UpgradeComponent>(KEY_UPG_ION_DRIVE) ?: return
+            val researchRes = resourceComp(world, KEY_RES_RESEARCH) ?: return
+            if (researchRes.amount < upg.costAmount) return
+            researchRes.amount = researchRes.amount - upg.costAmount
+            drivePhase = 1
+            driveMultiplier = BigDouble.of(2.0)
+            vesselDecayRate = 0.2f
+            world.get<GeneratorComponent>(KEY_GEN_COLONY_FLEET)?.unlocked = true
+            world.get<UpgradeComponent>(KEY_UPG_ION_DRIVE)?.purchased = true
+            return
+        }
+        // Hyperdrive: advance to Phase 2, requires Ion Drive first
+        if (upgradeId == KEY_UPG_HYPERDRIVE) {
+            if (drivePhase < 1 || drivePhase >= 2) return
+            val upg = world.get<UpgradeComponent>(KEY_UPG_HYPERDRIVE) ?: return
+            val coloniesRes = resourceComp(world, KEY_RES_COLONIES) ?: return
+            if (coloniesRes.amount < upg.costAmount) return
+            coloniesRes.amount = coloniesRes.amount - upg.costAmount
+            drivePhase = 2
+            driveMultiplier = BigDouble.of(4.0)
+            vesselDecayRate = 0.4f
+            world.get<GeneratorComponent>(KEY_GEN_GALACTIC_SENATE)?.unlocked = true
+            world.get<UpgradeComponent>(KEY_UPG_HYPERDRIVE)?.purchased = true
+            return
+        }
+        // Standard one-time upgrades (Advanced Sensors, Hull Plating, Long-Range Comms)
         val upg = world.get<UpgradeComponent>(upgradeId) ?: return
         if (upg.purchased && !upg.repeatable) return
         val costRes = resourceComp(world, "res_${upg.costType.name.lowercase()}") ?: return
@@ -207,11 +244,11 @@ class InterstellarSystem : GameSystem, PlayerActionHandler, Restorable {
                 world.get<GeneratorComponent>(effect.generatorId)?.let {
                     it.productionRate = it.productionRate * effect.multiplier
                 }
+            is UpgradeEffect.MultiplyTapProduction -> { /* applied dynamically in currentTapProduction */ }
             is UpgradeEffect.UnlockGenerator ->
                 world.get<GeneratorComponent>(effect.generatorId)?.unlocked = true
-            is UpgradeEffect.MultiplyTapProduction -> { /* applied dynamically in currentTapProduction */ }
-            is UpgradeEffect.ManualConversion -> { /* not used in this system */ }
-            is UpgradeEffect.ReduceConversionCost -> { /* not used in this system */ }
+            is UpgradeEffect.ManualConversion -> { }
+            is UpgradeEffect.ReduceConversionCost -> { }
         }
     }
 

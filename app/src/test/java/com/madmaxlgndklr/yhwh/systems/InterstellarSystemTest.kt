@@ -146,4 +146,83 @@ class InterstellarSystemTest {
         assertTrue("Shipyard should produce Vessels",
             world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount > BigDouble.ZERO)
     }
+
+    @Test fun `ion drive unlocks colony fleet`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_RESEARCH)!!.amount = BigDouble.of(100.0)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_ION_DRIVE)
+        assertTrue(world.get<GeneratorComponent>(InterstellarSystem.KEY_GEN_COLONY_FLEET)!!.unlocked)
+    }
+
+    @Test fun `ion drive doubles generator production via drive multiplier`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_RESEARCH)!!.amount = BigDouble.of(1000.0)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_ION_DRIVE)
+        system.purchaseGenerator(world, InterstellarSystem.KEY_GEN_SHIPYARD)
+        system.tick(world, delta = 1L)
+        val vessels = world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount
+        // Shipyard at level 1: productionRate=1.1, driveMultiplier=2.0 → 2.2 Vessels/tick
+        // minus decay 0.2/tick (ion phase) → net 2.0
+        assertTrue("Ion drive should give 2×+ vessel production", vessels.toDouble() >= 2.0)
+    }
+
+    @Test fun `ion drive doubles vessel decay rate`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_RESEARCH)!!.amount = BigDouble.of(100.0)
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount = BigDouble.of(10.0)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_ION_DRIVE)
+        system.tick(world, delta = 1L)
+        // Phase 1 decay = 0.2/tick → vessels go from 10.0 to ≤9.8
+        val vessels = world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount.toDouble()
+        assertTrue("Vessel decay should be 0.2 in ion phase", vessels <= 9.81)
+    }
+
+    @Test fun `hyperdrive is blocked until ion drive purchased`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_COLONIES)!!.amount = BigDouble.of(500.0)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_HYPERDRIVE)
+        assertFalse(world.get<UpgradeComponent>(InterstellarSystem.KEY_UPG_HYPERDRIVE)!!.purchased)
+    }
+
+    @Test fun `hyperdrive unlocks galactic senate`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_RESEARCH)!!.amount = BigDouble.of(100.0)
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_COLONIES)!!.amount = BigDouble.of(500.0)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_ION_DRIVE)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_HYPERDRIVE)
+        assertTrue(world.get<GeneratorComponent>(InterstellarSystem.KEY_GEN_GALACTIC_SENATE)!!.unlocked)
+    }
+
+    @Test fun `hyperdrive gives 4x total production`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_RESEARCH)!!.amount = BigDouble.of(1000.0)
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_COLONIES)!!.amount = BigDouble.of(500.0)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_ION_DRIVE)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_HYPERDRIVE)
+        system.purchaseGenerator(world, InterstellarSystem.KEY_GEN_SHIPYARD)
+        system.tick(world, delta = 1L)
+        val vessels = world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount
+        // Shipyard productionRate=1.1, driveMultiplier=4.0 → 4.4 Vessels/tick minus 0.4 decay → ≥4.0
+        assertTrue("Hyperdrive should give ~4x vessel production", vessels.toDouble() >= 4.0)
+    }
+
+    @Test fun `emergency repairs restores vessels`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_RESEARCH)!!.amount = BigDouble.of(100.0)
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount = BigDouble.of(10.0)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_EMERGENCY_REPAIRS)
+        assertEquals(35.0, world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount.toDouble(), 0.01)
+        assertEquals(50.0, world.get<ResourceComponent>(InterstellarSystem.KEY_RES_RESEARCH)!!.amount.toDouble(), 0.01)
+    }
+
+    @Test fun `emergency repairs requires sufficient research`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_RESEARCH)!!.amount = BigDouble.of(10.0)
+        val vesselsBefore = world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_EMERGENCY_REPAIRS)
+        assertEquals(vesselsBefore.toDouble(),
+            world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount.toDouble(), 0.01)
+    }
+
+    @Test fun `long range comms doubles colony fleet production`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_RESEARCH)!!.amount = BigDouble.of(100.0)
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_COLONIES)!!.amount = BigDouble.of(100.0)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_ION_DRIVE)
+        val fleetBefore = world.get<GeneratorComponent>(InterstellarSystem.KEY_GEN_COLONY_FLEET)!!.productionRate
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_LONG_RANGE_COMMS)
+        val fleetAfter = world.get<GeneratorComponent>(InterstellarSystem.KEY_GEN_COLONY_FLEET)!!.productionRate
+        assertEquals(fleetBefore.toDouble() * 2.0, fleetAfter.toDouble(), 0.01)
+    }
 }
