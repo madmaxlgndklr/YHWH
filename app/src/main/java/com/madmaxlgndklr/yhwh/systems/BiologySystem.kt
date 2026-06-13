@@ -48,7 +48,7 @@ class BiologySystem : GameSystem, PlayerActionHandler, Restorable {
 
         world.put(KEY_GEN_PREBIOTIC_SOUP, GeneratorComponent(
             id = KEY_GEN_PREBIOTIC_SOUP, productionType = ResourceType.AMINO_ACIDS,
-            productionRate = prebioticRate, costType = ResourceType.ENERGY,
+            productionRate = prebioticRate, costType = ResourceType.AMINO_ACIDS,
             costAmount = BigDouble.of(10.0), unlocked = true, level = 0
         ))
         world.put(KEY_GEN_PROTEIN_SYNTHESIZER, GeneratorComponent(
@@ -112,12 +112,13 @@ class BiologySystem : GameSystem, PlayerActionHandler, Restorable {
         val events = mutableListOf<GameEvent>()
         val bigDelta = BigDouble.of(delta.toDouble())
 
-        // Passive amino acid generation — guarantees steady progress even without Prebiotic Soup
+        // Passive + Prebiotic Soup amino acid generation; soup self-catalyzes (no ongoing resource cost)
+        val prebioticGen = world.get<GeneratorComponent>(KEY_GEN_PREBIOTIC_SOUP)
+        val prebioticBonus = if (prebioticGen != null && prebioticGen.unlocked && prebioticGen.level > 0)
+            prebioticGen.productionRate else BigDouble.ZERO
         resourceComp(world, KEY_RES_AMINO_ACIDS)?.let {
-            it.amount = it.amount + BASE_AMINO_ACIDS_PER_TICK * bigDelta
+            it.amount = it.amount + (BASE_AMINO_ACIDS_PER_TICK + prebioticBonus) * bigDelta
         }
-
-        runGenerator(world, KEY_GEN_PREBIOTIC_SOUP, bigDelta)
         runGenerator(world, KEY_GEN_PROTEIN_SYNTHESIZER, bigDelta)
         runGenerator(world, KEY_GEN_CELL_DIVISION, bigDelta)
         runGenerator(world, KEY_GEN_ORGANISM_INCUBATOR, bigDelta)
