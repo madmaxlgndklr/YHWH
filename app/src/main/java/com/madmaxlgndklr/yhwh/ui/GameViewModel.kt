@@ -23,6 +23,7 @@ import com.madmaxlgndklr.yhwh.persistence.SaveManager
 import com.madmaxlgndklr.yhwh.systems.BiologySystem
 import com.madmaxlgndklr.yhwh.systems.CosmologySystem
 import com.madmaxlgndklr.yhwh.systems.CivilizationSystem
+import com.madmaxlgndklr.yhwh.systems.InterstellarSystem
 import com.madmaxlgndklr.yhwh.systems.EvolutionSystem
 import com.madmaxlgndklr.yhwh.ui.state.CosmosState
 import com.madmaxlgndklr.yhwh.ui.state.GameUiState
@@ -108,7 +109,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         EpochType.COSMOLOGY -> "A world has formed. Life stirs in the primordial ocean."
                         EpochType.BIOLOGY -> "Organisms compete for survival. Evolution begins."
                         EpochType.EVOLUTION -> "Survivors of a million years rise from the wilderness. Civilization begins."
-                        else -> "The next age dawns."
+                        EpochType.CIVILIZATION -> "The great civilization looks to the stars. The interstellar age begins."
+                        EpochType.INTERSTELLAR -> "Humanity's legacy endures. The cosmos remembers."
                     } else _uiState.value.transitionMessage,
                     offlineEarningsSummary = _uiState.value.offlineEarningsSummary,
                     tutorialStep = _uiState.value.tutorialStep
@@ -122,6 +124,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             EpochType.BIOLOGY -> BiologySystem()
             EpochType.EVOLUTION -> EvolutionSystem()
             EpochType.CIVILIZATION -> CivilizationSystem()
+            EpochType.INTERSTELLAR -> InterstellarSystem()
             else -> CosmologySystem().also { it.seedBonus = meta.seedBonus }
         }
         engine.registerSystem(system)
@@ -260,7 +263,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             EpochType.COSMOLOGY -> engine.advanceEpoch(BiologySystem())
             EpochType.BIOLOGY -> engine.advanceEpoch(EvolutionSystem())
             EpochType.EVOLUTION -> engine.advanceEpoch(CivilizationSystem())
-            else -> { /* future epochs */ }
+            EpochType.CIVILIZATION -> engine.advanceEpoch(InterstellarSystem())
+            else -> { /* INTERSTELLAR is the final epoch — no advance */ }
         }
         epochTransitionAcknowledged = false
     }
@@ -366,6 +370,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     else -> "Ancient Era"
                 }
             } else "",
+            interstellarPhaseName = if (epoch == EpochType.INTERSTELLAR) {
+                when (interstellarDrivePhase()) {
+                    2 -> "Hyperdrive Era"
+                    1 -> "Ion Age"
+                    else -> "Sublight Era"
+                }
+            } else "",
+            vesselDecayRate = if (epoch == EpochType.INTERSTELLAR) vesselDecayRate else 0f,
         )
     }
 
@@ -402,6 +414,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     civilizationLevel = (knowledge.toDouble() / CivilizationSystem.KNOWLEDGE_VISUAL_THRESHOLD)
                         .toFloat().coerceIn(0f, 1f),
                     civilUnrestActive = civilUnrestActive
+                )
+            }
+            EpochType.INTERSTELLAR -> {
+                val colonies = resources[ResourceType.COLONIES.name] ?: BigDouble.ZERO
+                CosmosState(
+                    epoch = epoch,
+                    drivePhase = interstellarDrivePhase(),
+                    legacyLevel = (colonies.toDouble() / InterstellarSystem.COLONY_VISUAL_THRESHOLD)
+                        .toFloat().coerceIn(0f, 1f)
                 )
             }
             else -> {
@@ -450,6 +471,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return when {
             industrialPurchased -> 2
             medievalPurchased -> 1
+            else -> 0
+        }
+    }
+
+    private fun GameSnapshot.interstellarDrivePhase(): Int {
+        val ionPurchased = upgrades.find { it.id == InterstellarSystem.KEY_UPG_ION_DRIVE }?.purchased == true
+        val hyperdrivePurchased = upgrades.find { it.id == InterstellarSystem.KEY_UPG_HYPERDRIVE }?.purchased == true
+        return when {
+            hyperdrivePurchased -> 2
+            ionPurchased -> 1
             else -> 0
         }
     }
