@@ -30,4 +30,6 @@ data class GameUiState(
     val activeSeedMultiplier: Float = 1.0f,
     val unrestLevel: Float = 0f,
     val civilizationEraName: String = "",
+    val interstellarPhaseName: String = "",
+    val vesselDecayRate: Float = 0f,
 )

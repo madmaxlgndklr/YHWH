@@ -49,4 +49,5 @@ data class GameSnapshot(
     val unrestLevel: Float = 0f,
     val civilUnrestActive: Boolean = false,
     val saveSchemaVersion: Int = 0,
+    val vesselDecayRate: Float = 0f,
 )

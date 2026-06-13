@@ -22,4 +22,8 @@ enum class ResourceType(val displayName: String, val symbol: String) {
     CULTURE("Culture", "🎭"),
     KNOWLEDGE("Knowledge", "📚"),
     CIVILIZATION("Civilization", "🏛️"),
+    RESEARCH("Research", "🔭"),
+    VESSELS("Vessels", "🚀"),
+    COLONIES("Colonies", "🌌"),
+    LEGACY("Legacy", "🌠"),
 }

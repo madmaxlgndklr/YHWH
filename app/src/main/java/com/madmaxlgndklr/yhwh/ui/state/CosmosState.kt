@@ -17,4 +17,6 @@ data class CosmosState(
     val civEraLevel: Int = 0,
     val civilizationLevel: Float = 0f,
     val civilUnrestActive: Boolean = false,
+    val drivePhase: Int = 0,
+    val legacyLevel: Float = 0f,
 )
