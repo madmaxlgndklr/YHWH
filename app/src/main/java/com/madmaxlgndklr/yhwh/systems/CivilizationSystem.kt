@@ -66,7 +66,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
             productionRate = seedingBonus,
             costType = ResourceType.DOMINANCE,
             costAmount = BigDouble.ONE,
-            unlocked = true
+            unlocked = true, level = 0
         ))
         // Cultural Exchange starts locked; unlocked when Medieval Era is purchased
         world.put(KEY_GEN_CULTURAL_EXCHANGE, GeneratorComponent(
@@ -77,14 +77,13 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
             costAmount = BigDouble.of(2.0),
             unlocked = false
         ))
-        // Scholars Guild starts unlocked; cost guard prevents premature Knowledge production
         world.put(KEY_GEN_SCHOLARS_GUILD, GeneratorComponent(
             id = KEY_GEN_SCHOLARS_GUILD,
             productionType = ResourceType.KNOWLEDGE,
             productionRate = BigDouble.ONE,
             costType = ResourceType.CULTURE,
             costAmount = BigDouble.of(10.0),
-            unlocked = true
+            unlocked = true, level = 0
         ))
         // Enlightened Senate starts locked; requires era upgrade to unlock
         world.put(KEY_GEN_ENLIGHTENED_SENATE, GeneratorComponent(
@@ -191,6 +190,7 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
     ) {
         val gen = world.get<GeneratorComponent>(key) ?: return
         if (!gen.unlocked) return
+        if (gen.level == 0) return
         val costRes = resourceComp(world, "res_${gen.costType.name.lowercase()}") ?: return
         val totalCost = gen.costAmount * delta
         if (costRes.amount < totalCost) return
@@ -326,11 +326,14 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         )
         val generators = genMeta.keys.mapNotNull { key ->
             world.get<GeneratorComponent>(key)?.let { gen ->
+                val nextLevelCost = gen.costAmount * BigDouble.of(1.15.pow(gen.level.toDouble()))
+                val available = resourceComp(world, "res_${gen.costType.name.lowercase()}")?.amount ?: BigDouble.ZERO
                 GeneratorSnapshot(
                     id = gen.id, displayName = genMeta[key] ?: key,
                     productionType = gen.productionType, productionRate = gen.productionRate,
                     costType = gen.costType, costAmount = gen.costAmount,
-                    unlocked = gen.unlocked, level = gen.level
+                    unlocked = gen.unlocked, level = gen.level,
+                    nextLevelCost = nextLevelCost, canAfford = available >= nextLevelCost
                 )
             }
         }
@@ -372,7 +375,8 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
             tick = tick, epoch = EpochType.CIVILIZATION,
             resources = resources, generators = generators, upgrades = upgrades,
             epochProgress = epochProgress, events = emptyList(),
-            unrestLevel = unrestLevel, civilUnrestActive = civilUnrestActive
+            unrestLevel = unrestLevel, civilUnrestActive = civilUnrestActive,
+            saveSchemaVersion = 1
         )
     }
 }

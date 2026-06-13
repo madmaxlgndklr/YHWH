@@ -67,7 +67,7 @@ private fun ActionsTab(
     ) {
         item {
             Button(onClick = onTap, modifier = Modifier.fillMaxWidth()) {
-                Text("⚡ Quantum Fluctuation", fontSize = 16.sp)
+                Text("✨ Quantum Fluctuation", fontSize = 16.sp)
             }
         }
         items(generators.filter { it.unlocked }) { gen ->
@@ -92,16 +92,17 @@ private fun GeneratorCard(gen: GeneratorSnapshot, onPurchase: (String) -> Unit) 
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Lv.${gen.level}  Cost: ${gen.costAmount.toDisplayString()} ${gen.costType.symbol}",
+                    "Lv.${gen.level}  Next: ${gen.nextLevelCost.toDisplayString()} ${gen.costType.symbol}",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Button(
                 onClick = { onPurchase(gen.id) },
+                enabled = gen.canAfford,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             ) {
-                Text("▲", fontSize = 14.sp)
+                Text(if (gen.level == 0) "Buy" else "▲", fontSize = 14.sp)
             }
         }
     }

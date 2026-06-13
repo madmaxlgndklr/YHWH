@@ -57,15 +57,23 @@ class BiologySystemTest {
         assertEquals(1.3, gen.productionRate.toDouble(), 0.01)
     }
 
-    @Test fun `prebiotic soup produces amino acids when energy available`() {
-        world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)
-            ?: world.put(CosmologySystem.KEY_RES_ENERGY,
-                ResourceComponent(ResourceType.ENERGY, BigDouble.of(1000.0)))
-        world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!
-            .amount = BigDouble.of(1000.0)
+    @Test fun `prebiotic soup does not run at level 0`() {
+        world.put(CosmologySystem.KEY_RES_ENERGY,
+            ResourceComponent(ResourceType.ENERGY, BigDouble.of(1000.0)))
         system.tick(world, delta = 1L)
-        val aa = world.get<ResourceComponent>(BiologySystem.KEY_RES_AMINO_ACIDS)!!
-        assertTrue(aa.amount > BigDouble.ZERO)
+        // Passive amino acids (2.0/tick) still accumulate; verify energy is NOT consumed
+        assertEquals(1000.0, world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!.amount.toDouble(), 0.01)
+    }
+
+    @Test fun `prebiotic soup produces amino acids after purchase`() {
+        world.put(CosmologySystem.KEY_RES_ENERGY,
+            ResourceComponent(ResourceType.ENERGY, BigDouble.of(1000.0)))
+        system.purchaseGenerator(world, BiologySystem.KEY_GEN_PREBIOTIC_SOUP)
+        val energyBefore = world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!.amount
+        system.tick(world, delta = 1L)
+        val energyAfter = world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!.amount
+        assertTrue(energyAfter < energyBefore)
+        assertTrue(world.get<ResourceComponent>(BiologySystem.KEY_RES_AMINO_ACIDS)!!.amount > BigDouble.ZERO)
     }
 
     @Test fun `rna world upgrade unlocks protein synthesizer`() {

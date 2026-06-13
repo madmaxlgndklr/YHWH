@@ -194,6 +194,7 @@ class EvolutionSystemTest {
         // Seed organisms so Gene Pool can run (it costs Organisms)
         world.put(BiologySystem.KEY_RES_ORGANISMS,
             ResourceComponent(ResourceType.ORGANISMS, BigDouble.of(10000.0)))
+        world.get<GeneratorComponent>(EvolutionSystem.KEY_GEN_PRIMORDIAL_GENE_POOL)!!.level = 1
         // Give plenty of species to survive decay
         world.get<ResourceComponent>(EvolutionSystem.KEY_RES_SPECIES)!!
             .amount = BigDouble.of(10000.0)

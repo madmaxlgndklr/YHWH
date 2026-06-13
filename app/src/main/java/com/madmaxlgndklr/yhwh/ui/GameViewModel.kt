@@ -262,6 +262,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             EpochType.EVOLUTION -> engine.advanceEpoch(CivilizationSystem())
             else -> { /* future epochs */ }
         }
+        epochTransitionAcknowledged = false
     }
 
     fun dismissOfflineSummary() {

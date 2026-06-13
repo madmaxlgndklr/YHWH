@@ -49,7 +49,7 @@ class BiologySystem : GameSystem, PlayerActionHandler, Restorable {
         world.put(KEY_GEN_PREBIOTIC_SOUP, GeneratorComponent(
             id = KEY_GEN_PREBIOTIC_SOUP, productionType = ResourceType.AMINO_ACIDS,
             productionRate = prebioticRate, costType = ResourceType.ENERGY,
-            costAmount = BigDouble.of(10.0), unlocked = true
+            costAmount = BigDouble.of(10.0), unlocked = true, level = 0
         ))
         world.put(KEY_GEN_PROTEIN_SYNTHESIZER, GeneratorComponent(
             id = KEY_GEN_PROTEIN_SYNTHESIZER, productionType = ResourceType.PROTEINS,
@@ -59,7 +59,7 @@ class BiologySystem : GameSystem, PlayerActionHandler, Restorable {
         world.put(KEY_GEN_CELL_DIVISION, GeneratorComponent(
             id = KEY_GEN_CELL_DIVISION, productionType = ResourceType.CELLS,
             productionRate = BigDouble.ONE, costType = ResourceType.PROTEINS,
-            costAmount = BigDouble.of(10.0), unlocked = true
+            costAmount = BigDouble.of(10.0), unlocked = true, level = 0
         ))
         world.put(KEY_GEN_ORGANISM_INCUBATOR, GeneratorComponent(
             id = KEY_GEN_ORGANISM_INCUBATOR, productionType = ResourceType.ORGANISMS,
@@ -135,6 +135,7 @@ class BiologySystem : GameSystem, PlayerActionHandler, Restorable {
     private fun runGenerator(world: World, key: String, delta: BigDouble) {
         val gen = world.get<GeneratorComponent>(key) ?: return
         if (!gen.unlocked) return
+        if (gen.level == 0) return
         val costRes = resourceComp(world, "res_${gen.costType.name.lowercase()}") ?: return
         val totalCost = gen.costAmount * delta
         if (costRes.amount < totalCost) return
@@ -240,11 +241,14 @@ class BiologySystem : GameSystem, PlayerActionHandler, Restorable {
         )
         val generators = genMeta.keys.mapNotNull { key ->
             world.get<GeneratorComponent>(key)?.let { gen ->
+                val nextLevelCost = gen.costAmount * BigDouble.of(1.15.pow(gen.level.toDouble()))
+                val available = resourceComp(world, "res_${gen.costType.name.lowercase()}")?.amount ?: BigDouble.ZERO
                 GeneratorSnapshot(
                     id = gen.id, displayName = genMeta[key] ?: key,
                     productionType = gen.productionType, productionRate = gen.productionRate,
                     costType = gen.costType, costAmount = gen.costAmount,
-                    unlocked = gen.unlocked, level = gen.level
+                    unlocked = gen.unlocked, level = gen.level,
+                    nextLevelCost = nextLevelCost, canAfford = available >= nextLevelCost
                 )
             }
         }
@@ -275,7 +279,8 @@ class BiologySystem : GameSystem, PlayerActionHandler, Restorable {
         return GameSnapshot(
             tick = tick, epoch = EpochType.BIOLOGY,
             resources = resources, generators = generators, upgrades = upgrades,
-            epochProgress = epochProgress, events = emptyList()
+            epochProgress = epochProgress, events = emptyList(),
+            saveSchemaVersion = 1
         )
     }
 }

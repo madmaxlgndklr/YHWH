@@ -78,9 +78,11 @@ class GameEngine(
         savedSnapshot.upgrades.filter { it.purchased }.forEach { upgSnap ->
             world.get<UpgradeComponent>(upgSnap.id)?.purchased = true
         }
+        val oldSchema = savedSnapshot.saveSchemaVersion == 0
         savedSnapshot.generators.forEach { genSnap ->
             world.get<GeneratorComponent>(genSnap.id)?.let { gen ->
-                gen.level = genSnap.level
+                // Schema v0 used level=1 as "never purchased" default; migrate to level=0.
+                gen.level = if (oldSchema) (genSnap.level - 1).coerceAtLeast(0) else genSnap.level
                 gen.productionRate = genSnap.productionRate
                 gen.unlocked = genSnap.unlocked
             }

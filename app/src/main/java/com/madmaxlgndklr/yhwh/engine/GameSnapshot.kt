@@ -12,7 +12,9 @@ data class GeneratorSnapshot(
     val costType: ResourceType,
     val costAmount: BigDouble,
     val unlocked: Boolean,
-    val level: Int
+    val level: Int,
+    val nextLevelCost: BigDouble = BigDouble.ZERO,
+    val canAfford: Boolean = false
 )
 
 @Serializable
@@ -46,4 +48,5 @@ data class GameSnapshot(
     val eventTicksRemaining: Int = 0,
     val unrestLevel: Float = 0f,
     val civilUnrestActive: Boolean = false,
+    val saveSchemaVersion: Int = 0,
 )

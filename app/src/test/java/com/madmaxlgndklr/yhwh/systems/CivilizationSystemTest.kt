@@ -87,6 +87,7 @@ class CivilizationSystemTest {
     }
 
     @Test fun `scholars guild produces knowledge when culture is present`() {
+        world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_SCHOLARS_GUILD)!!.level = 1
         world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.of(100.0)
         system.tick(world, 1L)
         assertTrue(world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount > BigDouble.ZERO)
@@ -95,6 +96,7 @@ class CivilizationSystemTest {
     @Test fun `early settlements produces followers by consuming dominance`() {
         world.put(EvolutionSystem.KEY_RES_DOMINANCE,
             ResourceComponent(ResourceType.DOMINANCE, BigDouble.of(100.0)))
+        system.purchaseGenerator(world, CivilizationSystem.KEY_GEN_EARLY_SETTLEMENTS)
         val dominanceBefore = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_DOMINANCE)!!.amount
         system.tick(world, 1L)
         val dominanceAfter = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_DOMINANCE)!!.amount
@@ -175,6 +177,7 @@ class CivilizationSystemTest {
         world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(50.0)
         system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)
         world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.of(100.0)
+        world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_SCHOLARS_GUILD)!!.level = 1
         val knowledgeBefore = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount
         system.tick(world, 1L)
         val gained = (world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount - knowledgeBefore).toDouble()
@@ -198,6 +201,7 @@ class CivilizationSystemTest {
         system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)
         system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA)
         world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.of(100.0)
+        world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_SCHOLARS_GUILD)!!.level = 1
         val before = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount
         system.tick(world, 1L)
         val gained = (world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount - before).toDouble()
@@ -215,6 +219,7 @@ class CivilizationSystemTest {
         world.get<UpgradeComponent>(CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)!!.purchased = true
         system.syncStateFromWorld(world)
         world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.of(100.0)
+        world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_SCHOLARS_GUILD)!!.level = 1
         val before = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount
         system.tick(world, 1L)
         val gained = (world.get<ResourceComponent>(CivilizationSystem.KEY_RES_KNOWLEDGE)!!.amount - before).toDouble()
