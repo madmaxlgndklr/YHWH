@@ -98,6 +98,7 @@ fun CosmosCanvas(
                 1 -> Color(0xFF252018)   // Medieval
                 else -> Color(0xFF3D2800) // Ancient
             }
+            EpochType.INTERSTELLAR -> Color(0xFF060018)
             else -> if (state.planetsFormed) Color(0xFF001830) else Color(0xFF050510)
         },
         animationSpec = tween(durationMillis = 3000),
@@ -137,6 +138,10 @@ fun CosmosCanvas(
                     }
                     if (state.civilUnrestActive) drawCivilizationCrisisOverlay(glowPulse)
                 }
+                EpochType.INTERSTELLAR -> {
+                    drawVesselParticles(state.drivePhase, state.legacyLevel, orbitalAngle)
+                    if (state.drivePhase >= 2) drawHyperspaceStreaks(state.legacyLevel, orbitalAngle)
+                }
                 else -> {
                     if (state.matterLevel > 0f) drawMatterParticles(state.matterLevel)
                     if (state.starsFormed) drawStellarGlow(state.starLevel, glowPulse)
@@ -148,8 +153,11 @@ fun CosmosCanvas(
             @Suppress("UNUSED_EXPRESSION") burstTick
             val drawNow = System.currentTimeMillis()
             bursts.forEach { burst ->
-                if (state.epoch == EpochType.CIVILIZATION) drawCivilizationBurst(burst, drawNow)
-                else drawBurst(burst, drawNow)
+                when (state.epoch) {
+                    EpochType.CIVILIZATION -> drawCivilizationBurst(burst, drawNow)
+                    EpochType.INTERSTELLAR -> drawInterstellarBurst(burst, drawNow)
+                    else -> drawBurst(burst, drawNow)
+                }
             }
         }
     }
@@ -427,6 +435,62 @@ private fun DrawScope.drawCivilizationBurst(burst: TapBurst, now: Long) {
             color = Color(0xFFFFAA44).copy(alpha = alpha * 0.8f),
             topLeft = Offset(px - headR * 0.6f, py - headR * 0.5f),
             size = Size(headR * 1.2f, headR * 2f)
+        )
+    }
+}
+
+private fun DrawScope.drawVesselParticles(drivePhase: Int, legacyLevel: Float, orbitalAngle: Float) {
+    if (drivePhase < 1) return
+    val count = if (drivePhase >= 2) 8 else 4
+    val speed = if (drivePhase >= 2) 0.04f else 0.02f
+    val rng = Random(seed = 89L)
+    repeat(count) { i ->
+        val baseY = rng.nextFloat()
+        val progress = ((orbitalAngle / 360f) * speed * (i + 1) + rng.nextFloat()) % 1f
+        val x = progress * size.width
+        val y = (baseY + legacyLevel * 0.1f * rng.nextFloat()).coerceIn(0f, 1f) * size.height
+        val alpha = (0.5f + legacyLevel * 0.4f).coerceIn(0f, 1f)
+        drawCircle(
+            color = Color(0xFF00CCFF).copy(alpha = alpha),
+            radius = 3f + legacyLevel * 2f,
+            center = Offset(x, y)
+        )
+    }
+}
+
+private fun DrawScope.drawHyperspaceStreaks(legacyLevel: Float, orbitalAngle: Float) {
+    val count = (legacyLevel * 6).toInt().coerceAtLeast(2)
+    val rng = Random(seed = 113L)
+    repeat(count) { i ->
+        val y = (rng.nextFloat() * 0.8f + 0.1f) * size.height
+        val progress = (orbitalAngle / 360f + i * 0.17f) % 1f
+        val startX = progress * size.width * 1.5f - size.width * 0.25f
+        val length = size.width * (0.15f + legacyLevel * 0.1f)
+        drawLine(
+            color = Color(0xFF4488FF).copy(alpha = 0.20f + legacyLevel * 0.15f),
+            start = Offset(startX, y),
+            end = Offset(startX + length, y),
+            strokeWidth = 1.5f
+        )
+    }
+}
+
+private fun DrawScope.drawInterstellarBurst(burst: TapBurst, now: Long) {
+    val elapsed = (now - burst.startTime).coerceIn(0L, BURST_DURATION_MS)
+    val progress = elapsed / BURST_DURATION_MS.toFloat()
+    val rng = Random(burst.startTime.toInt())
+    repeat(BURST_PARTICLE_COUNT) { i ->
+        val angle = (i.toFloat() / BURST_PARTICLE_COUNT) * 2f * Math.PI.toFloat() +
+                rng.nextFloat() * 0.4f
+        val distance = BURST_MAX_RADIUS * progress
+        val px = burst.position.x + cos(angle) * distance
+        val py = burst.position.y + sin(angle) * distance
+        val alpha = (1f - progress).coerceIn(0f, 1f)
+        val radius = (4f * (1f - progress * 0.5f)).coerceAtLeast(1f)
+        drawCircle(
+            color = Color(0xFF00EEFF).copy(alpha = alpha * 0.9f),
+            radius = radius,
+            center = Offset(px, py)
         )
     }
 }
