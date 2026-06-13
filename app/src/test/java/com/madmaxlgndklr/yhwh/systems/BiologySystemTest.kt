@@ -58,22 +58,21 @@ class BiologySystemTest {
     }
 
     @Test fun `prebiotic soup does not run at level 0`() {
-        world.put(CosmologySystem.KEY_RES_ENERGY,
-            ResourceComponent(ResourceType.ENERGY, BigDouble.of(1000.0)))
+        val aaBefore = world.get<ResourceComponent>(BiologySystem.KEY_RES_AMINO_ACIDS)!!.amount
         system.tick(world, delta = 1L)
-        // Passive amino acids (2.0/tick) still accumulate; verify energy is NOT consumed
-        assertEquals(1000.0, world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!.amount.toDouble(), 0.01)
+        val aaAfter = world.get<ResourceComponent>(BiologySystem.KEY_RES_AMINO_ACIDS)!!.amount
+        // Only passive 2.0/tick; Prebiotic Soup at level 0 adds nothing
+        assertEquals(2.0, (aaAfter - aaBefore).toDouble(), 0.01)
     }
 
     @Test fun `prebiotic soup produces amino acids after purchase`() {
-        world.put(CosmologySystem.KEY_RES_ENERGY,
-            ResourceComponent(ResourceType.ENERGY, BigDouble.of(1000.0)))
+        world.get<ResourceComponent>(BiologySystem.KEY_RES_AMINO_ACIDS)!!.amount = BigDouble.of(100.0)
         system.purchaseGenerator(world, BiologySystem.KEY_GEN_PREBIOTIC_SOUP)
-        val energyBefore = world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!.amount
+        val aaBefore = world.get<ResourceComponent>(BiologySystem.KEY_RES_AMINO_ACIDS)!!.amount
         system.tick(world, delta = 1L)
-        val energyAfter = world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!.amount
-        assertTrue(energyAfter < energyBefore)
-        assertTrue(world.get<ResourceComponent>(BiologySystem.KEY_RES_AMINO_ACIDS)!!.amount > BigDouble.ZERO)
+        val aaAfter = world.get<ResourceComponent>(BiologySystem.KEY_RES_AMINO_ACIDS)!!.amount
+        // Passive (2.0) + Prebiotic Soup rate (1.0 default) = 3.0/tick; no ongoing resource consumed
+        assertTrue("Expected > 2.0 gained", (aaAfter - aaBefore).toDouble() > 2.0)
     }
 
     @Test fun `rna world upgrade unlocks protein synthesizer`() {

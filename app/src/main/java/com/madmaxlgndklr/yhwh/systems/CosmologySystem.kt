@@ -280,11 +280,14 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
         )
         val generators = genMeta.keys.mapNotNull { key ->
             world.get<GeneratorComponent>(key)?.let { gen ->
+                val nextLevelCost = gen.costAmount * BigDouble.of(1.15.pow(gen.level.toDouble()))
+                val available = resourceComp(world, "res_${gen.costType.name.lowercase()}")?.amount ?: BigDouble.ZERO
                 GeneratorSnapshot(
                     id = gen.id, displayName = genMeta[key] ?: key,
                     productionType = gen.productionType, productionRate = gen.productionRate,
                     costType = gen.costType, costAmount = gen.costAmount,
-                    unlocked = gen.unlocked, level = gen.level
+                    unlocked = gen.unlocked, level = gen.level,
+                    nextLevelCost = nextLevelCost, canAfford = available >= nextLevelCost
                 )
             }
         }
@@ -316,7 +319,8 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
         return GameSnapshot(
             tick = tick, epoch = EpochType.COSMOLOGY,
             resources = resources, generators = generators, upgrades = upgrades,
-            epochProgress = epochProgress, events = emptyList()
+            epochProgress = epochProgress, events = emptyList(),
+            saveSchemaVersion = 1
         )
     }
 }
