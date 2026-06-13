@@ -68,14 +68,13 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
             costAmount = BigDouble.ONE,
             unlocked = true, level = 0
         ))
-        // Cultural Exchange starts locked; unlocked when Medieval Era is purchased
         world.put(KEY_GEN_CULTURAL_EXCHANGE, GeneratorComponent(
             id = KEY_GEN_CULTURAL_EXCHANGE,
             productionType = ResourceType.CULTURE,
             productionRate = BigDouble.ONE,
             costType = ResourceType.FOLLOWERS,
             costAmount = BigDouble.of(2.0),
-            unlocked = false
+            unlocked = true, level = 0
         ))
         world.put(KEY_GEN_SCHOLARS_GUILD, GeneratorComponent(
             id = KEY_GEN_SCHOLARS_GUILD,
@@ -85,14 +84,13 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
             costAmount = BigDouble.of(10.0),
             unlocked = true, level = 0
         ))
-        // Enlightened Senate starts locked; requires era upgrade to unlock
         world.put(KEY_GEN_ENLIGHTENED_SENATE, GeneratorComponent(
             id = KEY_GEN_ENLIGHTENED_SENATE,
             productionType = ResourceType.CIVILIZATION,
             productionRate = BigDouble.ONE,
             costType = ResourceType.KNOWLEDGE,
             costAmount = BigDouble.of(5.0),
-            unlocked = false
+            unlocked = true, level = 0
         ))
 
         // Upgrades
@@ -310,12 +308,14 @@ class CivilizationSystem : GameSystem, PlayerActionHandler, Restorable {
         val culture = resourceComp(world, KEY_RES_CULTURE)?.amount ?: BigDouble.ZERO
         val knowledge = resourceComp(world, KEY_RES_KNOWLEDGE)?.amount ?: BigDouble.ZERO
         val civilization = resourceComp(world, KEY_RES_CIVILIZATION)?.amount ?: BigDouble.ZERO
+        val dominance = world.get<ResourceComponent>(EvolutionSystem.KEY_RES_DOMINANCE)?.amount ?: BigDouble.ZERO
 
         val resources = mapOf(
             ResourceType.FOLLOWERS.name to followers,
             ResourceType.CULTURE.name to culture,
             ResourceType.KNOWLEDGE.name to knowledge,
-            ResourceType.CIVILIZATION.name to civilization
+            ResourceType.CIVILIZATION.name to civilization,
+            ResourceType.DOMINANCE.name to dominance
         )
 
         val genMeta = mapOf(

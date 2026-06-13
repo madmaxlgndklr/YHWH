@@ -114,7 +114,7 @@ private fun UpgradesTab(upgrades: List<UpgradeSnapshot>, onPurchase: (String) ->
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(upgrades.filter { !it.purchased || it.repeatable }) { upg ->
+        items(upgrades.filter { (!it.purchased || it.repeatable) && !it.forkLocked }) { upg ->
             UpgradeCard(upg, onPurchase)
         }
     }

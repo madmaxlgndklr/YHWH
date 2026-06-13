@@ -46,16 +46,16 @@ class CivilizationSystemTest {
 
     // --- Generator initial state ---
 
-    @Test fun `cultural exchange starts locked`() {
-        assertFalse(world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_CULTURAL_EXCHANGE)!!.unlocked)
+    @Test fun `cultural exchange starts unlocked`() {
+        assertTrue(world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_CULTURAL_EXCHANGE)!!.unlocked)
     }
 
     @Test fun `scholars guild starts unlocked`() {
         assertTrue(world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_SCHOLARS_GUILD)!!.unlocked)
     }
 
-    @Test fun `enlightened senate starts locked`() {
-        assertFalse(world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_ENLIGHTENED_SENATE)!!.unlocked)
+    @Test fun `enlightened senate starts unlocked`() {
+        assertTrue(world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_ENLIGHTENED_SENATE)!!.unlocked)
     }
 
     // --- Tap ---
@@ -248,23 +248,23 @@ class CivilizationSystemTest {
     }
 
     @Test fun `era multiplier and crisis multiplier compose on cultural exchange`() {
-        // Set up Industrial era (4x) and trigger a crisis
+        // Set up Industrial era (4x) and level Cultural Exchange to level 1
         world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)!!.amount = BigDouble.of(250.0)
         system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_MEDIEVAL_ERA)
         system.purchaseUpgrade(world, CivilizationSystem.KEY_UPG_INDUSTRIAL_ERA)
-        // Unlock Cultural Exchange and prime Followers
-        world.get<GeneratorComponent>(CivilizationSystem.KEY_GEN_CULTURAL_EXCHANGE)!!.unlocked = true
+        // Level up Cultural Exchange (costs 2 Followers, first level)
         world.get<ResourceComponent>(CivilizationSystem.KEY_RES_FOLLOWERS)!!.amount = BigDouble.of(10000.0)
+        system.purchaseGenerator(world, CivilizationSystem.KEY_GEN_CULTURAL_EXCHANGE)
         // Trigger a crisis: industrial rate is 1.0/tick, needs 100 ticks
         repeat(100) { system.tick(world, 1L) }
         assertTrue("crisis should be active", system.toSnapshot(world, 0L).civilUnrestActive)
         // Zero out culture so Scholars Guild (cost=10) cannot drain the measurement tick
         world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount = BigDouble.ZERO
-        // During crisis: Cultural Exchange should produce at 4.0 * 0.5 = 2.0 per tick
+        // During crisis: Cultural Exchange (rate=1.1 after level-up) × 4.0 era × 0.5 crisis = 2.2/tick
         val cultureBefore = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount
         system.tick(world, 1L)
         val cultureAfter = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CULTURE)!!.amount
         val gained = (cultureAfter - cultureBefore).toDouble()
-        assertEquals(2.0, gained, 0.2)
+        assertEquals(2.2, gained, 0.1)
     }
 }

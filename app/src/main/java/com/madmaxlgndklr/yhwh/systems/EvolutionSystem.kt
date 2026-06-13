@@ -301,12 +301,14 @@ class EvolutionSystem : GameSystem, PlayerActionHandler, Restorable {
         val mutations = resourceComp(world, KEY_RES_MUTATIONS)?.amount ?: BigDouble.ZERO
         val species = resourceComp(world, KEY_RES_SPECIES)?.amount ?: BigDouble.ZERO
         val dominance = resourceComp(world, KEY_RES_DOMINANCE)?.amount ?: BigDouble.ZERO
+        val organisms = world.get<ResourceComponent>(BiologySystem.KEY_RES_ORGANISMS)?.amount ?: BigDouble.ZERO
 
         val resources = mapOf(
             ResourceType.GENES.name to genes,
             ResourceType.MUTATIONS.name to mutations,
             ResourceType.SPECIES.name to species,
-            ResourceType.DOMINANCE.name to dominance
+            ResourceType.DOMINANCE.name to dominance,
+            ResourceType.ORGANISMS.name to organisms
         )
 
         val genMeta = mapOf(
@@ -359,7 +361,8 @@ class EvolutionSystem : GameSystem, PlayerActionHandler, Restorable {
                     costAmount = upg.costAmount,
                     purchased = upg.purchased,
                     repeatable = upg.repeatable,
-                    available = available
+                    available = available,
+                    forkLocked = forkLocked
                 )
             }
         }

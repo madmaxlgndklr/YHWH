@@ -27,7 +27,9 @@ data class UpgradeSnapshot(
     val purchased: Boolean,
     val repeatable: Boolean,
     /** True if the player can afford and requirements are met. */
-    val available: Boolean
+    val available: Boolean,
+    /** True when a mutually-exclusive fork path was already chosen; hide from UI. */
+    val forkLocked: Boolean = false
 )
 
 /** Immutable snapshot of all game state, emitted by GameEngine each tick. */
