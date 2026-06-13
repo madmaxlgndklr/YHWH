@@ -82,11 +82,13 @@ class InterstellarSystem : GameSystem, PlayerActionHandler, Restorable {
             costType = ResourceType.RESEARCH, costAmount = BigDouble.of(50.0),
             effect = UpgradeEffect.MultiplyTapProduction(BigDouble.of(2.0))
         ))
+        // Sentinel effect — real halved-decay logic is applied in tick() by checking purchased flag
         world.put(KEY_UPG_HULL_PLATING, UpgradeComponent(
             id = KEY_UPG_HULL_PLATING, purchased = false,
             costType = ResourceType.VESSELS, costAmount = BigDouble.of(30.0),
             effect = UpgradeEffect.MultiplyTapProduction(BigDouble.ONE)
         ))
+        // Sentinel effect — repeatable; real vessel-restoration logic is in purchaseUpgrade()
         world.put(KEY_UPG_EMERGENCY_REPAIRS, UpgradeComponent(
             id = KEY_UPG_EMERGENCY_REPAIRS, purchased = false,
             costType = ResourceType.RESEARCH, costAmount = EMERGENCY_REPAIRS_COST,
@@ -98,11 +100,13 @@ class InterstellarSystem : GameSystem, PlayerActionHandler, Restorable {
             costType = ResourceType.COLONIES, costAmount = BigDouble.of(50.0),
             effect = UpgradeEffect.MultiplyProduction(KEY_GEN_COLONY_FLEET, BigDouble.of(2.0))
         ))
+        // Sentinel effect — real phase-advancement logic is in purchaseUpgrade()
         world.put(KEY_UPG_ION_DRIVE, UpgradeComponent(
             id = KEY_UPG_ION_DRIVE, purchased = false,
             costType = ResourceType.RESEARCH, costAmount = BigDouble.of(50.0),
             effect = UpgradeEffect.MultiplyTapProduction(BigDouble.ONE)
         ))
+        // Sentinel effect — requires drivePhase >= 1 (Ion Drive purchased); real logic in purchaseUpgrade()
         world.put(KEY_UPG_HYPERDRIVE, UpgradeComponent(
             id = KEY_UPG_HYPERDRIVE, purchased = false,
             costType = ResourceType.COLONIES, costAmount = BigDouble.of(200.0),
