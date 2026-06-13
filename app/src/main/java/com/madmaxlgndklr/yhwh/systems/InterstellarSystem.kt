@@ -114,7 +114,67 @@ class InterstellarSystem : GameSystem, PlayerActionHandler, Restorable {
         ))
     }
 
-    override fun tick(world: World, delta: Long): List<GameEvent> = emptyList()
+    override fun tick(world: World, delta: Long): List<GameEvent> {
+        val events = mutableListOf<GameEvent>()
+        val bigDelta = BigDouble.of(delta.toDouble())
+
+        // Passive Research floor — always 2.0/tick regardless of generators
+        resourceComp(world, KEY_RES_RESEARCH)?.let {
+            it.amount = it.amount + BASE_RESEARCH_PER_TICK * bigDelta
+        }
+
+        // Vessel Decay — applied every tick, floored at 0
+        val hullPurchased = world.get<UpgradeComponent>(KEY_UPG_HULL_PLATING)?.purchased == true
+        val decayPerTick = if (hullPurchased) vesselDecayRate * 0.5f else vesselDecayRate
+        val decayAmount = BigDouble.of(decayPerTick.toDouble()) * bigDelta
+        resourceComp(world, KEY_RES_VESSELS)?.let { vessels ->
+            vessels.amount = (vessels.amount - decayAmount).coerceAtLeast(BigDouble.ZERO)
+        }
+
+        runGenerator(world, KEY_GEN_RESEARCH_INSTITUTE, bigDelta)
+        runGenerator(world, KEY_GEN_SHIPYARD, bigDelta)
+        runGenerator(world, KEY_GEN_COLONY_FLEET, bigDelta)
+        runGenerator(world, KEY_GEN_GALACTIC_SENATE, bigDelta)
+
+        // Milestone events (fire once per resource type)
+        resourceComp(world, KEY_RES_RESEARCH)?.let {
+            if (!firstResearchFired && it.amount > BigDouble.ZERO) {
+                firstResearchFired = true
+                events.add(GameEvent(0L, "The stars await. Research begins.", isMilestone = true))
+            }
+        }
+        resourceComp(world, KEY_RES_VESSELS)?.let {
+            if (!firstVesselsFired && it.amount > BigDouble.ZERO) {
+                firstVesselsFired = true
+                events.add(GameEvent(0L, "First starship assembled and launched.", isMilestone = true))
+            }
+        }
+        resourceComp(world, KEY_RES_COLONIES)?.let {
+            if (!firstColoniesFired && it.amount > BigDouble.ZERO) {
+                firstColoniesFired = true
+                events.add(GameEvent(0L, "A new world settles among the stars.", isMilestone = true))
+            }
+        }
+        resourceComp(world, KEY_RES_LEGACY)?.let {
+            if (!firstLegacyFired && it.amount > BigDouble.ZERO) {
+                firstLegacyFired = true
+                events.add(GameEvent(0L, "Humanity's legacy endures beyond the cosmos.", isMilestone = true))
+            }
+        }
+        return events
+    }
+
+    private fun runGenerator(world: World, key: String, delta: BigDouble) {
+        val gen = world.get<GeneratorComponent>(key) ?: return
+        if (!gen.unlocked) return
+        if (gen.level == 0) return
+        val costRes = resourceComp(world, "res_${gen.costType.name.lowercase()}") ?: return
+        val totalCost = gen.costAmount * delta
+        if (costRes.amount < totalCost) return
+        costRes.amount = costRes.amount - totalCost
+        val prodRes = resourceComp(world, "res_${gen.productionType.name.lowercase()}") ?: return
+        prodRes.amount = prodRes.amount + gen.productionRate * delta * driveMultiplier
+    }
 
     override fun onTap(world: World) {
         resourceComp(world, KEY_RES_RESEARCH)?.let { it.amount = it.amount + currentTapProduction(world) }
