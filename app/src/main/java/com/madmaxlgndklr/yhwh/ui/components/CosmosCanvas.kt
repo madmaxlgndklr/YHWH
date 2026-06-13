@@ -440,9 +440,9 @@ private fun DrawScope.drawCivilizationBurst(burst: TapBurst, now: Long) {
 }
 
 private fun DrawScope.drawVesselParticles(drivePhase: Int, legacyLevel: Float, orbitalAngle: Float) {
-    if (drivePhase < 1) return
+    if (drivePhase == 0) return
     val count = if (drivePhase >= 2) 8 else 4
-    val speed = if (drivePhase >= 2) 0.04f else 0.02f
+    val speed = if (drivePhase >= 2) 2.0f else 1.0f
     val rng = Random(seed = 89L)
     repeat(count) { i ->
         val baseY = rng.nextFloat()
