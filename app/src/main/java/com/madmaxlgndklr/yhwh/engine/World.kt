@@ -10,6 +10,9 @@ class World {
 
     fun put(key: String, component: Component) { state[key] = component }
 
+    /** Only inserts [component] if [key] is not already present. Preserves existing state during restore. */
+    fun putIfAbsent(key: String, component: Component) { state.putIfAbsent(key, component) }
+
     inline fun <reified T : Component> get(key: String): T? = state[key] as? T
 
     inline fun <reified T : Component> getAll(): List<Pair<String, T>> =

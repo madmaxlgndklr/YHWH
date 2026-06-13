@@ -225,4 +225,51 @@ class InterstellarSystemTest {
         val fleetAfter = world.get<GeneratorComponent>(InterstellarSystem.KEY_GEN_COLONY_FLEET)!!.productionRate
         assertEquals(fleetBefore.toDouble() * 2.0, fleetAfter.toDouble(), 0.01)
     }
+
+    @Test fun `epoch progress is 0 with no legacy`() {
+        val snap = system.toSnapshot(world, 0L)
+        assertEquals(0f, snap.epochProgress, 0.01f)
+    }
+
+    @Test fun `epoch progress is 1 with 1000 legacy`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_LEGACY)!!.amount = BigDouble.of(1000.0)
+        val snap = system.toSnapshot(world, 0L)
+        assertEquals(1f, snap.epochProgress, 0.01f)
+    }
+
+    @Test fun `hyperdrive shows unavailable in snapshot when ion not purchased`() {
+        val snap = system.toSnapshot(world, 0L)
+        val hyperdriveSnap = snap.upgrades.first { it.id == InterstellarSystem.KEY_UPG_HYPERDRIVE }
+        assertFalse(hyperdriveSnap.available)
+    }
+
+    @Test fun `syncStateFromWorld restores drive phase from world`() {
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_RESEARCH)!!.amount = BigDouble.of(100.0)
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_COLONIES)!!.amount = BigDouble.of(500.0)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_ION_DRIVE)
+        system.purchaseUpgrade(world, InterstellarSystem.KEY_UPG_HYPERDRIVE)
+
+        val restoredSystem = InterstellarSystem()
+        restoredSystem.initialize(world)
+        restoredSystem.syncStateFromWorld(world)
+
+        // After sync, decay rate should be 0.4 (Hyperdrive phase)
+        world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount = BigDouble.of(10.0)
+        restoredSystem.tick(world, delta = 1L)
+        val vessels = world.get<ResourceComponent>(InterstellarSystem.KEY_RES_VESSELS)!!.amount.toDouble()
+        assertTrue("Hyperdrive decay should be 0.4/tick after sync", vessels <= 9.65)
+    }
+
+    @Test fun `toSnapshot includes all four resources`() {
+        val snap = system.toSnapshot(world, 0L)
+        assertTrue(snap.resources.containsKey(ResourceType.RESEARCH.name))
+        assertTrue(snap.resources.containsKey(ResourceType.VESSELS.name))
+        assertTrue(snap.resources.containsKey(ResourceType.COLONIES.name))
+        assertTrue(snap.resources.containsKey(ResourceType.LEGACY.name))
+    }
+
+    @Test fun `toSnapshot sets saveSchemaVersion to 1`() {
+        val snap = system.toSnapshot(world, 0L)
+        assertEquals(1, snap.saveSchemaVersion)
+    }
 }

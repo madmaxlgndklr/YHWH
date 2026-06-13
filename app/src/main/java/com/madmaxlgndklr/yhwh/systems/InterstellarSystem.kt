@@ -77,37 +77,38 @@ class InterstellarSystem : GameSystem, PlayerActionHandler, Restorable {
             unlocked = false, level = 0
         ))
 
-        world.put(KEY_UPG_ADVANCED_SENSORS, UpgradeComponent(
+        // Upgrades: use putIfAbsent so purchased flags survive re-initialization during restore
+        world.putIfAbsent(KEY_UPG_ADVANCED_SENSORS, UpgradeComponent(
             id = KEY_UPG_ADVANCED_SENSORS, purchased = false,
             costType = ResourceType.RESEARCH, costAmount = BigDouble.of(50.0),
             effect = UpgradeEffect.MultiplyTapProduction(BigDouble.of(2.0))
         ))
         // Sentinel effect — real halved-decay logic is applied in tick() by checking purchased flag
-        world.put(KEY_UPG_HULL_PLATING, UpgradeComponent(
+        world.putIfAbsent(KEY_UPG_HULL_PLATING, UpgradeComponent(
             id = KEY_UPG_HULL_PLATING, purchased = false,
             costType = ResourceType.VESSELS, costAmount = BigDouble.of(30.0),
             effect = UpgradeEffect.MultiplyTapProduction(BigDouble.ONE)
         ))
         // Sentinel effect — repeatable; real vessel-restoration logic is in purchaseUpgrade()
-        world.put(KEY_UPG_EMERGENCY_REPAIRS, UpgradeComponent(
+        world.putIfAbsent(KEY_UPG_EMERGENCY_REPAIRS, UpgradeComponent(
             id = KEY_UPG_EMERGENCY_REPAIRS, purchased = false,
             costType = ResourceType.RESEARCH, costAmount = EMERGENCY_REPAIRS_COST,
             effect = UpgradeEffect.MultiplyTapProduction(BigDouble.ONE),
             repeatable = true
         ))
-        world.put(KEY_UPG_LONG_RANGE_COMMS, UpgradeComponent(
+        world.putIfAbsent(KEY_UPG_LONG_RANGE_COMMS, UpgradeComponent(
             id = KEY_UPG_LONG_RANGE_COMMS, purchased = false,
             costType = ResourceType.COLONIES, costAmount = BigDouble.of(50.0),
             effect = UpgradeEffect.MultiplyProduction(KEY_GEN_COLONY_FLEET, BigDouble.of(2.0))
         ))
         // Sentinel effect — real phase-advancement logic is in purchaseUpgrade()
-        world.put(KEY_UPG_ION_DRIVE, UpgradeComponent(
+        world.putIfAbsent(KEY_UPG_ION_DRIVE, UpgradeComponent(
             id = KEY_UPG_ION_DRIVE, purchased = false,
             costType = ResourceType.RESEARCH, costAmount = BigDouble.of(50.0),
             effect = UpgradeEffect.MultiplyTapProduction(BigDouble.ONE)
         ))
         // Sentinel effect — requires drivePhase >= 1 (Ion Drive purchased); real logic in purchaseUpgrade()
-        world.put(KEY_UPG_HYPERDRIVE, UpgradeComponent(
+        world.putIfAbsent(KEY_UPG_HYPERDRIVE, UpgradeComponent(
             id = KEY_UPG_HYPERDRIVE, purchased = false,
             costType = ResourceType.COLONIES, costAmount = BigDouble.of(200.0),
             effect = UpgradeEffect.MultiplyTapProduction(BigDouble.ONE)
@@ -263,13 +264,104 @@ class InterstellarSystem : GameSystem, PlayerActionHandler, Restorable {
         gen.level++
     }
 
-    override fun syncStateFromWorld(world: World) {}
+    override fun syncStateFromWorld(world: World) {
+        val ionPurchased = world.get<UpgradeComponent>(KEY_UPG_ION_DRIVE)?.purchased == true
+        val hyperdrivePurchased = world.get<UpgradeComponent>(KEY_UPG_HYPERDRIVE)?.purchased == true
+        drivePhase = when {
+            hyperdrivePurchased -> 2
+            ionPurchased -> 1
+            else -> 0
+        }
+        driveMultiplier = when (drivePhase) {
+            2 -> BigDouble.of(4.0)
+            1 -> BigDouble.of(2.0)
+            else -> BigDouble.ONE
+        }
+        vesselDecayRate = when (drivePhase) {
+            2 -> 0.4f
+            1 -> 0.2f
+            else -> 0.1f
+        }
+        firstResearchFired  = (resourceComp(world, KEY_RES_RESEARCH)?.amount  ?: BigDouble.ZERO) > BigDouble.ZERO
+        firstVesselsFired   = (resourceComp(world, KEY_RES_VESSELS)?.amount   ?: BigDouble.ZERO) > BigDouble.ZERO
+        firstColoniesFired  = (resourceComp(world, KEY_RES_COLONIES)?.amount  ?: BigDouble.ZERO) > BigDouble.ZERO
+        firstLegacyFired    = (resourceComp(world, KEY_RES_LEGACY)?.amount    ?: BigDouble.ZERO) > BigDouble.ZERO
+    }
 
-    override fun toSnapshot(world: World, tick: Long): GameSnapshot = GameSnapshot(
-        tick = tick, epoch = EpochType.INTERSTELLAR,
-        resources = emptyMap(), generators = emptyList(), upgrades = emptyList(),
-        epochProgress = 0f, events = emptyList()
-    )
+    override fun toSnapshot(world: World, tick: Long): GameSnapshot {
+        val research = resourceComp(world, KEY_RES_RESEARCH)?.amount ?: BigDouble.ZERO
+        val vessels  = resourceComp(world, KEY_RES_VESSELS)?.amount  ?: BigDouble.ZERO
+        val colonies = resourceComp(world, KEY_RES_COLONIES)?.amount ?: BigDouble.ZERO
+        val legacy   = resourceComp(world, KEY_RES_LEGACY)?.amount   ?: BigDouble.ZERO
+
+        val resources = mapOf(
+            ResourceType.RESEARCH.name to research,
+            ResourceType.VESSELS.name  to vessels,
+            ResourceType.COLONIES.name to colonies,
+            ResourceType.LEGACY.name   to legacy
+        )
+
+        val genMeta = mapOf(
+            KEY_GEN_RESEARCH_INSTITUTE to "Research Institute",
+            KEY_GEN_SHIPYARD           to "Shipyard",
+            KEY_GEN_COLONY_FLEET       to "Colony Fleet",
+            KEY_GEN_GALACTIC_SENATE    to "Galactic Senate"
+        )
+        val generators = genMeta.keys.mapNotNull { key ->
+            world.get<GeneratorComponent>(key)?.let { gen ->
+                val nextLevelCost = gen.costAmount * BigDouble.of(1.15.pow(gen.level.toDouble()))
+                val available = resourceComp(world, "res_${gen.costType.name.lowercase()}")?.amount ?: BigDouble.ZERO
+                GeneratorSnapshot(
+                    id = gen.id, displayName = genMeta[key] ?: key,
+                    productionType = gen.productionType, productionRate = gen.productionRate,
+                    costType = gen.costType, costAmount = gen.costAmount,
+                    unlocked = gen.unlocked, level = gen.level,
+                    nextLevelCost = nextLevelCost, canAfford = available >= nextLevelCost
+                )
+            }
+        }
+
+        val ionPurchased = world.get<UpgradeComponent>(KEY_UPG_ION_DRIVE)?.purchased == true
+
+        val upgMeta = mapOf(
+            KEY_UPG_ADVANCED_SENSORS  to Pair("Advanced Sensors",  "×2 Research per tap"),
+            KEY_UPG_HULL_PLATING      to Pair("Hull Plating",      "½ Vessel decay rate"),
+            KEY_UPG_EMERGENCY_REPAIRS to Pair("Emergency Repairs", "50 🔭 → +25 🚀"),
+            KEY_UPG_LONG_RANGE_COMMS  to Pair("Long-Range Comms",  "×2 Colony Fleet production"),
+            KEY_UPG_ION_DRIVE         to Pair("Ion Drive",         "Advance to Ion Age"),
+            KEY_UPG_HYPERDRIVE        to Pair("Hyperdrive",        "Advance to Hyperdrive Era")
+        )
+        val upgrades = upgMeta.keys.mapNotNull { key ->
+            world.get<UpgradeComponent>(key)?.let { upg ->
+                val availableResource = resources[upg.costType.name] ?: BigDouble.ZERO
+                val available = when {
+                    key == KEY_UPG_HYPERDRIVE && !ionPurchased -> false
+                    upg.purchased && !upg.repeatable -> false
+                    else -> availableResource >= upg.costAmount
+                }
+                UpgradeSnapshot(
+                    id = upg.id,
+                    displayName = upgMeta[key]!!.first,
+                    description  = upgMeta[key]!!.second,
+                    costType = upg.costType,
+                    costAmount = upg.costAmount,
+                    purchased = upg.purchased,
+                    repeatable = upg.repeatable,
+                    available = available
+                )
+            }
+        }
+
+        val epochProgress = (legacy.toDouble() / WIN_THRESHOLD).toFloat().coerceIn(0f, 1f)
+
+        return GameSnapshot(
+            tick = tick, epoch = EpochType.INTERSTELLAR,
+            resources = resources, generators = generators, upgrades = upgrades,
+            epochProgress = epochProgress, events = emptyList(),
+            vesselDecayRate = vesselDecayRate,
+            saveSchemaVersion = 1
+        )
+    }
 
     private fun resourceComp(world: World, key: String) = world.get<ResourceComponent>(key)
 }
