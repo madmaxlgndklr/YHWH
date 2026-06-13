@@ -60,7 +60,7 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
         world.put(KEY_GEN_NEBULA, GeneratorComponent(
             id = KEY_GEN_NEBULA, productionType = ResourceType.MATTER,
             productionRate = BigDouble.ONE, costType = ResourceType.ENERGY,
-            costAmount = BigDouble.of(10.0), unlocked = true
+            costAmount = BigDouble.of(10.0), unlocked = true, level = 0
         ))
         world.put(KEY_GEN_FUSION, GeneratorComponent(
             id = KEY_GEN_FUSION, productionType = ResourceType.HYDROGEN,
@@ -70,7 +70,7 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
         world.put(KEY_GEN_STELLAR, GeneratorComponent(
             id = KEY_GEN_STELLAR, productionType = ResourceType.STARS,
             productionRate = BigDouble.ONE, costType = ResourceType.HYDROGEN,
-            costAmount = BigDouble.of(10.0), unlocked = true
+            costAmount = BigDouble.of(10.0), unlocked = true, level = 0
         ))
         world.put(KEY_GEN_ACCRETION, GeneratorComponent(
             id = KEY_GEN_ACCRETION, productionType = ResourceType.ACCRETION_DISKS,
@@ -169,6 +169,7 @@ class CosmologySystem : GameSystem, PlayerActionHandler, Restorable {
     private fun runGenerator(world: World, key: String, delta: BigDouble) {
         val gen = world.get<GeneratorComponent>(key) ?: return
         if (!gen.unlocked) return
+        if (gen.level == 0) return
         val costRes = resourceComp(world, "res_${gen.costType.name.lowercase()}") ?: return
         val totalCost = gen.costAmount * delta
         if (costRes.amount < totalCost) return

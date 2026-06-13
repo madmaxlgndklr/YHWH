@@ -41,8 +41,16 @@ class CosmologySystemTest {
         assertTrue(energy.amount > BigDouble.ZERO)
     }
 
-    @Test fun `nebula generator produces matter when energy is sufficient`() {
+    @Test fun `nebula generator does not run at level 0`() {
         world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!.amount = BigDouble.of(1000.0)
+        system.tick(world, delta = 1L)
+        val matter = world.get<ResourceComponent>(CosmologySystem.KEY_RES_MATTER)!!
+        assertEquals(0.0, matter.amount.toDouble(), 0.01)
+    }
+
+    @Test fun `nebula generator produces matter after purchase`() {
+        world.get<ResourceComponent>(CosmologySystem.KEY_RES_ENERGY)!!.amount = BigDouble.of(1000.0)
+        system.purchaseGenerator(world, CosmologySystem.KEY_GEN_NEBULA)
         system.tick(world, delta = 1L)
         val matter = world.get<ResourceComponent>(CosmologySystem.KEY_RES_MATTER)!!
         assertTrue(matter.amount > BigDouble.ZERO)
