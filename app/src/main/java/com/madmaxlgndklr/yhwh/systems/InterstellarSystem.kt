@@ -293,12 +293,14 @@ class InterstellarSystem : GameSystem, PlayerActionHandler, Restorable {
         val vessels  = resourceComp(world, KEY_RES_VESSELS)?.amount  ?: BigDouble.ZERO
         val colonies = resourceComp(world, KEY_RES_COLONIES)?.amount ?: BigDouble.ZERO
         val legacy   = resourceComp(world, KEY_RES_LEGACY)?.amount   ?: BigDouble.ZERO
+        val civilization = world.get<ResourceComponent>(CivilizationSystem.KEY_RES_CIVILIZATION)?.amount ?: BigDouble.ZERO
 
         val resources = mapOf(
             ResourceType.RESEARCH.name to research,
             ResourceType.VESSELS.name  to vessels,
             ResourceType.COLONIES.name to colonies,
-            ResourceType.LEGACY.name   to legacy
+            ResourceType.LEGACY.name   to legacy,
+            ResourceType.CIVILIZATION.name to civilization
         )
 
         val genMeta = mapOf(
